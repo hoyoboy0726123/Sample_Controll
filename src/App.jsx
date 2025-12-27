@@ -18,7 +18,8 @@ import {
   Camera,
   Image as ImageIcon,
   X,
-  Trash2
+  Trash2,
+  Menu // Added Menu icon
 } from 'lucide-react';
 import { getInventory, getTransactions, inbound, outbound, returnItem, subscribe, exportDB, importDB, getUsers, saveUser, getSuggestions, deleteItem, deleteTransaction } from './lib/db';
 import { compressImage } from './lib/image';
@@ -193,11 +194,12 @@ const Toast = ({ message, type, onClose }) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [loginName, setLoginName] = useState(''); // Fix: State for login input
+  const [loginName, setLoginName] = useState('');
   const [currentView, setCurrentView] = useState('dashboard');
   const [inventory, setInventory] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [toast, setToast] = useState(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Mobile Menu State
   const fileInputRef = useRef(null);
 
   // Auth Simulation
@@ -214,7 +216,7 @@ export default function App() {
     if (!loginName.trim()) return;
     const u = { name: loginName, email: loginName, uid: 'local-' + Date.now() };
     localStorage.setItem('local_user', JSON.stringify(u));
-    await saveUser(loginName); // Save user to DB
+    await saveUser(loginName); 
     setUser(u);
   };
 
@@ -223,6 +225,11 @@ export default function App() {
     setUser(null);
     setLoginName('');
   };
+
+  // Close mobile menu when view changes
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [currentView]);
 
   // Data Fetching
   useEffect(() => {
@@ -292,7 +299,7 @@ export default function App() {
       }
     };
     reader.readAsText(file);
-    e.target.value = ''; // Reset input
+    e.target.value = ''; 
   };
 
   // --- Actions ---
@@ -334,8 +341,8 @@ export default function App() {
   // --- Login Screen ---
   if (!user && !loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="bg-white p-8 rounded-lg shadow-md w-96 border-t-4 border-gray-600">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+        <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-sm border-t-4 border-gray-600">
           <div className="flex justify-center mb-4">
             <CloudOff size={48} className="text-gray-600" />
           </div>
@@ -365,7 +372,7 @@ export default function App() {
 
   // --- Main Layout ---
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
+    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans relative">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
       {/* Hidden File Input for Restore */}
@@ -377,11 +384,34 @@ export default function App() {
         className="hidden" 
       />
 
+      {/* Mobile Header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-slate-900 text-white flex items-center px-4 z-40 shadow-md">
+        <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 hover:bg-slate-800 rounded-md">
+          <Menu size={24} />
+        </button>
+        <span className="ml-3 font-bold text-lg">樣品管理 (Local)</span>
+      </div>
+
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="w-64 bg-slate-900 text-white flex flex-col shadow-xl">
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 text-white flex flex-col shadow-xl transition-transform duration-300 ease-in-out
+        lg:relative lg:translate-x-0
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
         <div className="p-6 border-b border-slate-700 flex items-center gap-3">
           <CloudOff className="text-gray-400" />
           <span className="font-bold text-xl">樣品管理 (Local)</span>
+          <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden ml-auto text-slate-400">
+            <X size={24} />
+          </button>
         </div>
         
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
@@ -419,7 +449,7 @@ export default function App() {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto p-8">
+      <main className="flex-1 overflow-auto p-4 lg:p-8 pt-20 lg:pt-8 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           {currentView === 'dashboard' && <DashboardView inventory={inventory} transactions={transactions} onViewChange={setCurrentView} />}
           {currentView === 'inbound' && <InboundForm user={user} onSubmit={handleInbound} onCancel={() => setCurrentView('dashboard')} />}
@@ -463,7 +493,7 @@ const DashboardView = ({ inventory, transactions, onViewChange }) => {
       <h1 className="text-2xl font-bold text-gray-800">儀表板 (Local)</h1>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card className="p-6 border-l-4 border-blue-500">
           <div className="flex justify-between items-start">
             <div>

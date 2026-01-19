@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createPtyService } from './pty-service.js';
@@ -102,4 +102,18 @@ ptyService.onExit((id, code) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('terminal:exit', { id, code });
   }
+});
+
+// IPC 通信处理 - 选择文件夹
+ipcMain.handle('dialog:selectFolder', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: '选择项目文件夹'
+  });
+
+  if (result.canceled) {
+    return { canceled: true };
+  }
+
+  return { canceled: false, path: result.filePaths[0] };
 });

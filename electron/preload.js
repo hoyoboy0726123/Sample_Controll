@@ -27,5 +27,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 移除监听器
   removeListener: (channel) => {
     ipcRenderer.removeAllListeners(channel);
-  }
+  },
+
+  // 选择文件夹
+  selectFolder: () => ipcRenderer.invoke('dialog:selectFolder')
 });

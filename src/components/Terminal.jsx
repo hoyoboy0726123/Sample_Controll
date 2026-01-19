@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
 
-export default function Terminal({ id, isActive, onFocus }) {
-  const { terminalRef, isReady, focus } = useTerminal(id);
+export default function Terminal({ id, shell, cwd, isActive, onFocus }) {
+  const { terminalRef, isReady, focus } = useTerminal(id, shell, cwd);
 
   useEffect(() => {
     if (isActive && isReady) {

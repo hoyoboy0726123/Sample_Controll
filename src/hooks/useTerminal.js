@@ -4,7 +4,7 @@ import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import 'xterm/css/xterm.css';
 
-export function useTerminal(terminalId) {
+export function useTerminal(terminalId, shell, cwd) {
   const terminalRef = useRef(null);
   const xtermRef = useRef(null);
   const fitAddonRef = useRef(null);
@@ -63,7 +63,8 @@ export function useTerminal(terminalId) {
     if (window.electronAPI) {
       window.electronAPI.createTerminal({
         id: terminalId,
-        cwd: process.env.HOME || process.env.USERPROFILE,
+        cwd: cwd || process.env.HOME || process.env.USERPROFILE,
+        shell: shell,
       }).then(() => {
         setIsReady(true);
       });
@@ -117,7 +118,7 @@ export function useTerminal(terminalId) {
         window.electronAPI.closeTerminal(terminalId);
       }
     };
-  }, [terminalId]);
+  }, [terminalId, shell, cwd]);
 
   const focus = () => {
     if (xtermRef.current) {

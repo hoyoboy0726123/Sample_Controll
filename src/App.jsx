@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import TabBar from './components/TabBar';
 import Terminal from './components/Terminal';
 import SplitView from './components/SplitView';
+import NewTerminalDialog from './components/NewTerminalDialog';
+import SettingsPanel from './components/SettingsPanel';
 import { Settings, Moon, Sun } from 'lucide-react';
 
 let terminalIdCounter = 0;
@@ -11,6 +13,24 @@ function App() {
   const [activeTabId, setActiveTabId] = useState(null);
   const [splitMode, setSplitMode] = useState(false);
   const [theme, setTheme] = useState('dark');
+  const [showNewTerminalDialog, setShowNewTerminalDialog] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settings, setSettings] = useState({
+    defaultShell: 'auto',
+    fontSize: 14,
+    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    theme: 'dark',
+  });
+
+  // 加载设置
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('terminalSettings');
+    if (savedSettings) {
+      const parsed = JSON.parse(savedSettings);
+      setSettings(parsed);
+      setTheme(parsed.theme);
+    }
+  }, []);
 
   // 创建初始终端
   useEffect(() => {
@@ -18,16 +38,32 @@ function App() {
   }, []);
 
   // 创建新标签页
-  const createNewTab = useCallback(() => {
+  const createNewTab = useCallback((options = {}) => {
     const id = `terminal-${terminalIdCounter++}`;
+    const shell = options.shell === 'auto' || !options.shell
+      ? (settings.defaultShell === 'auto' ? undefined : settings.defaultShell)
+      : options.shell;
+
     const newTab = {
       id,
       title: `Terminal ${terminalIdCounter}`,
+      shell,
+      cwd: options.cwd,
     };
 
     setTabs((prev) => [...prev, newTab]);
     setActiveTabId(id);
+  }, [settings.defaultShell]);
+
+  // 显示新建终端对话框
+  const handleNewTabClick = useCallback(() => {
+    setShowNewTerminalDialog(true);
   }, []);
+
+  // 从对话框创建终端
+  const handleCreateTerminal = useCallback((options) => {
+    createNewTab(options);
+  }, [createNewTab]);
 
   // 关闭标签页
   const closeTab = useCallback((id) => {
@@ -69,7 +105,7 @@ function App() {
       // Ctrl+T: 新建终端
       if (e.ctrlKey && e.key === 't') {
         e.preventDefault();
-        createNewTab();
+        handleNewTabClick();
       }
 
       // Ctrl+W: 关闭当前终端
@@ -98,7 +134,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, tabs, createNewTab, closeTab, toggleSplitMode, selectTab]);
+  }, [activeTabId, tabs, handleNewTabClick, closeTab, toggleSplitMode, selectTab]);
 
   // 渲染终端
   const renderTerminals = () => {
@@ -116,12 +152,16 @@ function App() {
           <Terminal
             key={activeTab.id}
             id={activeTab.id}
+            shell={activeTab.shell}
+            cwd={activeTab.cwd}
             isActive={true}
             onFocus={() => selectTab(activeTab.id)}
           />
           <Terminal
             key={nextTab.id}
             id={nextTab.id}
+            shell={nextTab.shell}
+            cwd={nextTab.cwd}
             isActive={false}
             onFocus={() => selectTab(nextTab.id)}
           />
@@ -134,6 +174,8 @@ function App() {
       <Terminal
         key={activeTab.id}
         id={activeTab.id}
+        shell={activeTab.shell}
+        cwd={activeTab.cwd}
         isActive={true}
         onFocus={() => selectTab(activeTab.id)}
       />
@@ -170,6 +212,7 @@ function App() {
 
           <button
             className="p-2 text-gray-400 hover:text-white hover:bg-[#363636] rounded transition-colors"
+            onClick={() => setShowSettings(true)}
             title="设置"
           >
             <Settings size={16} />
@@ -183,7 +226,7 @@ function App() {
         activeTabId={activeTabId}
         onTabSelect={selectTab}
         onTabClose={closeTab}
-        onNewTab={createNewTab}
+        onNewTab={handleNewTabClick}
       />
 
       {/* 终端内容区域 */}
@@ -202,6 +245,24 @@ function App() {
           <span>主题: {theme === 'dark' ? '深色' : '浅色'}</span>
         </div>
       </div>
+
+      {/* 对话框 */}
+      <NewTerminalDialog
+        isOpen={showNewTerminalDialog}
+        onClose={() => setShowNewTerminalDialog(false)}
+        onConfirm={handleCreateTerminal}
+        defaultShell={settings.defaultShell}
+        defaultPath=""
+      />
+
+      <SettingsPanel
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onSave={(newSettings) => {
+          setSettings(newSettings);
+          setTheme(newSettings.theme);
+        }}
+      />
     </div>
   );
 }

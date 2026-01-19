@@ -22,22 +22,69 @@ function App() {
     fontSize: 14,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: 'dark',
+    restoreSession: true,
   });
 
-  // 加载设置
+  // 載入設定並恢復會話
   useEffect(() => {
+    // 先載入設定
     const savedSettings = localStorage.getItem('terminalSettings');
-    if (savedSettings) {
-      const parsed = JSON.parse(savedSettings);
-      setSettings(parsed);
-      setTheme(parsed.theme);
-    }
-  }, []);
+    let shouldRestoreSession = true; // 預設啟用
 
-  // 创建初始终端
-  useEffect(() => {
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setSettings(parsed);
+        setTheme(parsed.theme);
+        shouldRestoreSession = parsed.restoreSession !== false; // 如果設定中有值就使用，否則預設為 true
+      } catch (error) {
+        console.error('載入設定失敗:', error);
+      }
+    }
+
+    // 根據設定決定是否恢復會話
+    if (shouldRestoreSession) {
+      const savedSession = localStorage.getItem('lastSession');
+
+      if (savedSession) {
+        try {
+          const session = JSON.parse(savedSession);
+
+          // 恢復終端機計數器
+          if (session.terminalIdCounter) {
+            terminalIdCounter = session.terminalIdCounter;
+          }
+
+          // 恢復所有終端機標籤
+          if (session.tabs && session.tabs.length > 0) {
+            setTabs(session.tabs);
+            setActiveTabId(session.activeTabId || session.tabs[0].id);
+            return; // 成功恢復會話，不需要創建新終端機
+          }
+        } catch (error) {
+          console.error('恢復會話失敗:', error);
+        }
+      }
+    }
+
+    // 如果不恢復會話、沒有保存的會話或恢復失敗，創建新終端機
     createNewTab();
   }, []);
+
+  // 自動保存會話（當終端機標籤改變時）
+  useEffect(() => {
+    // 只有在有終端機時才保存
+    if (tabs.length > 0) {
+      const session = {
+        tabs,
+        activeTabId,
+        terminalIdCounter,
+        timestamp: Date.now()
+      };
+
+      localStorage.setItem('lastSession', JSON.stringify(session));
+    }
+  }, [tabs, activeTabId]);
 
   // 创建新标签页
   const createNewTab = useCallback((options = {}) => {

@@ -7,6 +7,7 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
     fontSize: 14,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: 'dark',
+    restoreSession: true, // 預設啟用會話恢復
   });
 
   useEffect(() => {
@@ -107,6 +108,24 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   終端機使用的字型
+                </p>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={settings.restoreSession}
+                    onChange={(e) => setSettings({ ...settings, restoreSession: e.target.checked })}
+                    className="w-4 h-4 bg-[#3c3c3c] border border-[#555] rounded
+                               focus:outline-none focus:ring-2 focus:ring-[#007acc]"
+                  />
+                  <span className="text-sm font-medium text-gray-300">
+                    啟動時自動恢復上次會話
+                  </span>
+                </label>
+                <p className="mt-1 text-xs text-gray-500 ml-6">
+                  重新開啟應用程式時，自動恢復上次關閉時的所有終端機
                 </p>
               </div>
             </div>

@@ -4,7 +4,8 @@ import Terminal from './components/Terminal';
 import SplitView from './components/SplitView';
 import NewTerminalDialog from './components/NewTerminalDialog';
 import SettingsPanel from './components/SettingsPanel';
-import { Settings, Moon, Sun } from 'lucide-react';
+import ProjectGroupsManager from './components/ProjectGroupsManager';
+import { Settings, Moon, Sun, FolderOpen } from 'lucide-react';
 
 let terminalIdCounter = 0;
 
@@ -15,6 +16,7 @@ function App() {
   const [theme, setTheme] = useState('dark');
   const [showNewTerminalDialog, setShowNewTerminalDialog] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showProjectGroups, setShowProjectGroups] = useState(false);
   const [settings, setSettings] = useState({
     defaultShell: 'auto',
     fontSize: 14,
@@ -63,6 +65,16 @@ function App() {
   // 从对话框创建终端
   const handleCreateTerminal = useCallback((options) => {
     createNewTab(options);
+  }, [createNewTab]);
+
+  // 打開項目組（同時打開多個終端機）
+  const handleOpenProjectGroup = useCallback((group) => {
+    group.terminals.forEach((terminal) => {
+      createNewTab({
+        shell: terminal.shell === 'auto' ? undefined : terminal.shell,
+        cwd: terminal.path
+      });
+    });
   }, [createNewTab]);
 
   // 关闭标签页
@@ -204,8 +216,16 @@ function App() {
 
           <button
             className="p-2 text-gray-400 hover:text-white hover:bg-[#363636] rounded transition-colors"
+            onClick={() => setShowProjectGroups(true)}
+            title="專案群組"
+          >
+            <FolderOpen size={16} />
+          </button>
+
+          <button
+            className="p-2 text-gray-400 hover:text-white hover:bg-[#363636] rounded transition-colors"
             onClick={toggleTheme}
-            title="切换主题"
+            title="切換主題"
           >
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
@@ -213,7 +233,7 @@ function App() {
           <button
             className="p-2 text-gray-400 hover:text-white hover:bg-[#363636] rounded transition-colors"
             onClick={() => setShowSettings(true)}
-            title="设置"
+            title="設定"
           >
             <Settings size={16} />
           </button>
@@ -234,15 +254,15 @@ function App() {
         {renderTerminals()}
       </div>
 
-      {/* 底部状态栏 */}
+      {/* 底部狀態列 */}
       <div className="flex items-center justify-between bg-[#007acc] px-4 h-6 text-white text-xs">
         <div className="flex items-center gap-4">
-          <span>终端: {tabs.length}</span>
-          <span>活动: {activeTabId}</span>
+          <span>終端機: {tabs.length}</span>
+          <span>活動: {activeTabId}</span>
         </div>
         <div className="flex items-center gap-4">
-          <span>模式: {splitMode ? '分屏' : '单屏'}</span>
-          <span>主题: {theme === 'dark' ? '深色' : '浅色'}</span>
+          <span>模式: {splitMode ? '分屏' : '單屏'}</span>
+          <span>主題: {theme === 'dark' ? '深色' : '淺色'}</span>
         </div>
       </div>
 
@@ -262,6 +282,12 @@ function App() {
           setSettings(newSettings);
           setTheme(newSettings.theme);
         }}
+      />
+
+      <ProjectGroupsManager
+        isOpen={showProjectGroups}
+        onClose={() => setShowProjectGroups(false)}
+        onOpenGroup={handleOpenProjectGroup}
       />
     </div>
   );

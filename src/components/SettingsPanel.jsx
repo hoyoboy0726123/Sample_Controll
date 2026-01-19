@@ -10,7 +10,7 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
   });
 
   useEffect(() => {
-    // 从 localStorage 加载设置
+    // 從 localStorage 載入設定
     const savedSettings = localStorage.getItem('terminalSettings');
     if (savedSettings) {
       setSettings(JSON.parse(savedSettings));
@@ -26,7 +26,7 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
   if (!isOpen) return null;
 
   const shellOptions = [
-    { value: 'auto', label: '自动检测' },
+    { value: 'auto', label: '自動檢測' },
     { value: 'powershell.exe', label: 'PowerShell' },
     { value: 'cmd.exe', label: 'CMD' },
     { value: 'bash', label: 'Bash' },
@@ -37,9 +37,9 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-[#252526] rounded-lg shadow-2xl w-[600px] max-w-[90vw] max-h-[80vh] overflow-y-auto">
-        {/* 标题栏 */}
+        {/* 標題欄 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#3e3e3e] sticky top-0 bg-[#252526]">
-          <h2 className="font-semibold text-white">设置</h2>
+          <h2 className="font-semibold text-white">設定</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white p-1 rounded hover:bg-[#3e3e3e] transition-colors"
@@ -48,16 +48,16 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
           </button>
         </div>
 
-        {/* 内容区域 */}
+        {/* 內容區域 */}
         <div className="p-6 space-y-6">
-          {/* 默认 Shell */}
+          {/* 預設 Shell */}
           <div>
-            <h3 className="text-lg font-medium text-white mb-3">终端设置</h3>
+            <h3 className="text-lg font-medium text-white mb-3">終端機設定</h3>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  默认 Shell
+                  預設 Shell
                 </label>
                 <select
                   value={settings.defaultShell}
@@ -72,13 +72,13 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
                   ))}
                 </select>
                 <p className="mt-1 text-xs text-gray-500">
-                  新建终端时使用的默认 Shell
+                  新建終端機時使用的預設 Shell
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  字体大小
+                  字型大小
                 </label>
                 <input
                   type="number"
@@ -90,13 +90,13 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
                              focus:outline-none focus:border-[#007acc] transition-colors"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  终端字体大小 (10-24)
+                  終端機字型大小 (10-24)
                 </p>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  字体族
+                  字型系列
                 </label>
                 <input
                   type="text"
@@ -106,19 +106,19 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
                              focus:outline-none focus:border-[#007acc] transition-colors"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  终端使用的字体
+                  終端機使用的字型
                 </p>
               </div>
             </div>
           </div>
 
-          {/* 外观设置 */}
+          {/* 外觀設定 */}
           <div>
-            <h3 className="text-lg font-medium text-white mb-3">外观</h3>
+            <h3 className="text-lg font-medium text-white mb-3">外觀</h3>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                主题
+                主題
               </label>
               <select
                 value={settings.theme}
@@ -126,40 +126,40 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
                 className="w-full px-3 py-2 bg-[#3c3c3c] text-white border border-[#555] rounded
                            focus:outline-none focus:border-[#007acc] transition-colors"
               >
-                <option value="dark">暗色</option>
-                <option value="light">亮色</option>
+                <option value="dark">深色</option>
+                <option value="light">淺色</option>
               </select>
               <p className="mt-1 text-xs text-gray-500">
-                应用程序主题
+                應用程式主題
               </p>
             </div>
           </div>
 
-          {/* 快捷键说明 */}
+          {/* 快速鍵說明 */}
           <div>
-            <h3 className="text-lg font-medium text-white mb-3">快捷键</h3>
+            <h3 className="text-lg font-medium text-white mb-3">快速鍵</h3>
             <div className="bg-[#1e1e1e] rounded p-4 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-400">新建终端</span>
+                <span className="text-gray-400">新建終端機</span>
                 <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + T</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">关闭终端</span>
+                <span className="text-gray-400">關閉終端機</span>
                 <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + W</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">切换分屏</span>
+                <span className="text-gray-400">切換分屏</span>
                 <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + \</kbd>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-400">切换标签</span>
+                <span className="text-gray-400">切換標籤</span>
                 <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + 1-9</kbd>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 底部按钮 */}
+        {/* 底部按鈕 */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#3e3e3e] sticky bottom-0 bg-[#252526]">
           <button
             onClick={onClose}
@@ -173,7 +173,7 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
                        transition-colors font-medium flex items-center gap-2"
           >
             <Save size={16} />
-            保存设置
+            儲存設定
           </button>
         </div>
       </div>

@@ -17,6 +17,13 @@ export default function NewTerminalDialog({ isOpen, onClose, onConfirm, defaultS
   };
 
   const handleConfirm = () => {
+    // 保存最近使用的路徑
+    if (selectedPath) {
+      const recentPaths = JSON.parse(localStorage.getItem('recentPaths') || '[]');
+      const updated = [selectedPath, ...recentPaths.filter(p => p !== selectedPath)].slice(0, 10);
+      localStorage.setItem('recentPaths', JSON.stringify(updated));
+    }
+
     onConfirm({
       shell: selectedShell,
       cwd: selectedPath || undefined
@@ -25,9 +32,9 @@ export default function NewTerminalDialog({ isOpen, onClose, onConfirm, defaultS
   };
 
   const shellOptions = [
-    { value: 'auto', label: '自动检测', description: '根据系统自动选择' },
+    { value: 'auto', label: '自動檢測', description: '根據系統自動選擇' },
     { value: 'powershell.exe', label: 'PowerShell', description: 'Windows PowerShell' },
-    { value: 'cmd.exe', label: 'CMD', description: 'Windows 命令提示符' },
+    { value: 'cmd.exe', label: 'CMD', description: 'Windows 命令提示字元' },
     { value: 'bash', label: 'Bash', description: 'Bash Shell' },
     { value: '/bin/zsh', label: 'Zsh', description: 'Z Shell' },
     { value: 'C:\\Program Files\\Git\\bin\\bash.exe', label: 'Git Bash', description: 'Git for Windows Bash' },
@@ -36,11 +43,11 @@ export default function NewTerminalDialog({ isOpen, onClose, onConfirm, defaultS
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-[#252526] rounded-lg shadow-2xl w-[500px] max-w-[90vw]">
-        {/* 标题栏 */}
+        {/* 標題欄 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#3e3e3e]">
           <div className="flex items-center gap-2 text-white">
             <TerminalIcon size={20} />
-            <h2 className="font-semibold">新建终端</h2>
+            <h2 className="font-semibold">新建終端機</h2>
           </div>
           <button
             onClick={onClose}
@@ -50,12 +57,12 @@ export default function NewTerminalDialog({ isOpen, onClose, onConfirm, defaultS
           </button>
         </div>
 
-        {/* 内容区域 */}
+        {/* 內容區域 */}
         <div className="p-6 space-y-5">
-          {/* Shell 选择 */}
+          {/* Shell 選擇 */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              选择 Shell
+              選擇 Shell
             </label>
             <select
               value={selectedShell}
@@ -70,21 +77,21 @@ export default function NewTerminalDialog({ isOpen, onClose, onConfirm, defaultS
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500">
-              选择此终端使用的 Shell 类型
+              選擇此終端機使用的 Shell 類型
             </p>
           </div>
 
-          {/* 工作目录 */}
+          {/* 工作目錄 */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">
-              工作目录
+              工作目錄
             </label>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={selectedPath}
                 onChange={(e) => setSelectedPath(e.target.value)}
-                placeholder="留空使用默认目录"
+                placeholder="留空使用預設目錄"
                 className="flex-1 px-3 py-2 bg-[#3c3c3c] text-white border border-[#555] rounded
                            focus:outline-none focus:border-[#007acc] transition-colors"
               />
@@ -94,16 +101,16 @@ export default function NewTerminalDialog({ isOpen, onClose, onConfirm, defaultS
                            transition-colors flex items-center gap-2"
               >
                 <Folder size={16} />
-                浏览
+                瀏覽
               </button>
             </div>
             <p className="mt-1 text-xs text-gray-500">
-              终端将从此目录启动
+              終端機將從此目錄啟動
             </p>
           </div>
         </div>
 
-        {/* 底部按钮 */}
+        {/* 底部按鈕 */}
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-[#3e3e3e]">
           <button
             onClick={onClose}
@@ -116,7 +123,7 @@ export default function NewTerminalDialog({ isOpen, onClose, onConfirm, defaultS
             className="px-4 py-2 bg-[#0e639c] text-white rounded hover:bg-[#1177bb]
                        transition-colors font-medium"
           >
-            创建终端
+            建立終端機
           </button>
         </div>
       </div>

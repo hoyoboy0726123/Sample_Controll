@@ -6,13 +6,20 @@ export default {
   ],
   theme: {
     extend: {
-      animation: {
-        'fade-in-up': 'fadeInUp 0.3s ease-out',
-      },
-      keyframes: {
-        fadeInUp: {
-          '0%': { opacity: '0', transform: 'translateY(10px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
+      colors: {
+        terminal: {
+          bg: '#1e1e1e',
+          text: '#d4d4d4',
+          selection: '#264f78',
+          cursor: '#ffffff',
+          black: '#000000',
+          red: '#cd3131',
+          green: '#0dbc79',
+          yellow: '#e5e510',
+          blue: '#2472c8',
+          magenta: '#bc3fbc',
+          cyan: '#11a8cd',
+          white: '#e5e5e5',
         }
       }
     },

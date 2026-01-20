@@ -33,6 +33,17 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     // 註釋掉自動開啟 DevTools，用戶可以按 F12 手動開啟
     // mainWindow.webContents.openDevTools();
+
+    // 添加 F12 快捷鍵來切換開發者工具
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      if (input.key === 'F12') {
+        if (mainWindow.webContents.isDevToolsOpened()) {
+          mainWindow.webContents.closeDevTools();
+        } else {
+          mainWindow.webContents.openDevTools();
+        }
+      }
+    });
   } else {
     // 生产环境加载打包后的文件
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));

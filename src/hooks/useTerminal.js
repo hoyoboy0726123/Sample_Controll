@@ -43,6 +43,8 @@ export function useTerminal(terminalId, shell, cwd) {
       },
       allowTransparency: true,
       scrollback: 10000,
+      rows: 24,
+      cols: 80,
     });
 
     // 添加插件
@@ -89,15 +91,9 @@ export function useTerminal(terminalId, shell, cwd) {
     }
 
     // 窗口大小改变时自适应
+    let isInitialized = false;
     const handleResize = () => {
       if (!fitAddonRef.current || !xtermRef.current || !terminalRef.current) {
-        return;
-      }
-
-      // 检查 xterm 的内部状态是否准备好
-      const xterm = xtermRef.current;
-      if (!xterm._core || !xterm._core.viewport) {
-        console.warn('Terminal viewport not ready yet');
         return;
       }
 
@@ -108,7 +104,9 @@ export function useTerminal(terminalId, shell, cwd) {
           window.electronAPI.resizeTerminal(terminalId, dims.cols, dims.rows);
         }
       } catch (e) {
-        console.warn('Failed to fit terminal on resize:', e);
+        if (isInitialized) {
+          console.warn('Failed to fit terminal on resize:', e);
+        }
       }
     };
 
@@ -120,8 +118,9 @@ export function useTerminal(terminalId, shell, cwd) {
 
     // 初始化时延迟调用 fit()，确保 xterm 内部状态完全初始化
     const initTimer = setTimeout(() => {
+      isInitialized = true;
       handleResize();
-    }, 100);
+    }, 300);
 
     // 清理
     return () => {

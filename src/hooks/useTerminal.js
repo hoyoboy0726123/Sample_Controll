@@ -55,17 +55,6 @@ export function useTerminal(terminalId, shell, cwd) {
     // 挂载终端
     xterm.open(terminalRef.current);
 
-    // 延迟调用 fit() 确保 DOM 完全渲染
-    setTimeout(() => {
-      if (fitAddon && terminalRef.current) {
-        try {
-          fitAddon.fit();
-        } catch (e) {
-          console.warn('Failed to fit terminal on initial render:', e);
-        }
-      }
-    }, 0);
-
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
 
@@ -119,6 +108,13 @@ export function useTerminal(terminalId, shell, cwd) {
     if (terminalRef.current) {
       resizeObserver.observe(terminalRef.current);
     }
+
+    // 初始化时调用一次 fit()，使用 requestAnimationFrame 确保 DOM 已渲染
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        handleResize();
+      });
+    });
 
     // 清理
     return () => {

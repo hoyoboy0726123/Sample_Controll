@@ -54,7 +54,17 @@ export function useTerminal(terminalId, shell, cwd) {
 
     // 挂载终端
     xterm.open(terminalRef.current);
-    fitAddon.fit();
+
+    // 延迟调用 fit() 确保 DOM 完全渲染
+    setTimeout(() => {
+      if (fitAddon && terminalRef.current) {
+        try {
+          fitAddon.fit();
+        } catch (e) {
+          console.warn('Failed to fit terminal on initial render:', e);
+        }
+      }
+    }, 0);
 
     xtermRef.current = xterm;
     fitAddonRef.current = fitAddon;
@@ -91,11 +101,15 @@ export function useTerminal(terminalId, shell, cwd) {
 
     // 窗口大小改变时自适应
     const handleResize = () => {
-      if (fitAddonRef.current && xtermRef.current) {
-        fitAddonRef.current.fit();
-        const dims = fitAddonRef.current.proposeDimensions();
-        if (dims && window.electronAPI) {
-          window.electronAPI.resizeTerminal(terminalId, dims.cols, dims.rows);
+      if (fitAddonRef.current && xtermRef.current && terminalRef.current) {
+        try {
+          fitAddonRef.current.fit();
+          const dims = fitAddonRef.current.proposeDimensions();
+          if (dims && window.electronAPI) {
+            window.electronAPI.resizeTerminal(terminalId, dims.cols, dims.rows);
+          }
+        } catch (e) {
+          console.warn('Failed to fit terminal on resize:', e);
         }
       }
     };

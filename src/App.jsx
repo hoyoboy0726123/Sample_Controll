@@ -207,47 +207,78 @@ function App() {
 
   // 渲染终端
   const renderTerminals = () => {
-    const activeTab = tabs.find((tab) => tab.id === activeTabId);
-    if (!activeTab) return null;
+    if (tabs.length === 0) return null;
 
     if (splitMode && tabs.length >= 2) {
       // 分屏模式：显示当前标签和下一个标签
       const currentIndex = tabs.findIndex((tab) => tab.id === activeTabId);
       const nextIndex = (currentIndex + 1) % tabs.length;
       const nextTab = tabs[nextIndex];
+      const activeTab = tabs[currentIndex];
 
       return (
-        <SplitView>
-          <Terminal
-            key={activeTab.id}
-            id={activeTab.id}
-            shell={activeTab.shell}
-            cwd={activeTab.cwd}
-            isActive={true}
-            onFocus={() => selectTab(activeTab.id)}
-          />
-          <Terminal
-            key={nextTab.id}
-            id={nextTab.id}
-            shell={nextTab.shell}
-            cwd={nextTab.cwd}
-            isActive={false}
-            onFocus={() => selectTab(nextTab.id)}
-          />
-        </SplitView>
+        <>
+          {/* 渲染所有終端以保持狀態 */}
+          <div className="hidden">
+            {tabs.map((tab) => {
+              // 跳過已在分屏中顯示的終端
+              if (tab.id === activeTab.id || tab.id === nextTab.id) return null;
+              return (
+                <Terminal
+                  key={tab.id}
+                  id={tab.id}
+                  shell={tab.shell}
+                  cwd={tab.cwd}
+                  isActive={false}
+                  onFocus={() => selectTab(tab.id)}
+                />
+              );
+            })}
+          </div>
+
+          {/* 顯示分屏終端 */}
+          <SplitView>
+            <Terminal
+              key={activeTab.id}
+              id={activeTab.id}
+              shell={activeTab.shell}
+              cwd={activeTab.cwd}
+              isActive={true}
+              onFocus={() => selectTab(activeTab.id)}
+            />
+            <Terminal
+              key={nextTab.id}
+              id={nextTab.id}
+              shell={nextTab.shell}
+              cwd={nextTab.cwd}
+              isActive={false}
+              onFocus={() => selectTab(nextTab.id)}
+            />
+          </SplitView>
+        </>
       );
     }
 
-    // 单屏模式：只显示当前活动标签
+    // 单屏模式：渲染所有终端，但只显示活动的
+    // 使用 CSS 隐藏而不是卸载，保持终端状态
     return (
-      <Terminal
-        key={activeTab.id}
-        id={activeTab.id}
-        shell={activeTab.shell}
-        cwd={activeTab.cwd}
-        isActive={true}
-        onFocus={() => selectTab(activeTab.id)}
-      />
+      <div className="h-full w-full relative">
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            className="absolute inset-0"
+            style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
+          >
+            <Terminal
+              id={tab.id}
+              shell={tab.shell}
+              cwd={tab.cwd}
+              isActive={tab.id === activeTabId}
+              onFocus={() => selectTab(tab.id)}
+            />
+          </div>
+        ))}
+      </div>
     );
   };
 

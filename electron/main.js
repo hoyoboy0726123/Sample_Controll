@@ -66,7 +66,7 @@ ipcMain.handle('terminal:create', async (event, options) => {
     const { id, cwd, shell } = options;
     ptyService.createTerminal(id, {
       cwd: cwd || process.env.HOME || process.env.USERPROFILE,
-      shell: shell || process.env.SHELL || 'bash'
+      shell: shell || 'auto'
     });
     return { success: true, id };
   } catch (error) {

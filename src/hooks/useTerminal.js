@@ -9,9 +9,12 @@ export function useTerminal(terminalId, shell, cwd) {
   const xtermRef = useRef(null);
   const fitAddonRef = useRef(null);
   const [isReady, setIsReady] = useState(false);
+  const isInitializingRef = useRef(false);
 
   useEffect(() => {
-    if (!terminalRef.current || xtermRef.current) return;
+    // 防止重複初始化
+    if (!terminalRef.current || xtermRef.current || isInitializingRef.current) return;
+    isInitializingRef.current = true;
 
     let resizeObserver = null;
     let isInitialized = false;
@@ -159,6 +162,8 @@ export function useTerminal(terminalId, shell, cwd) {
       if (window.electronAPI) {
         window.electronAPI.closeTerminal(terminalId);
       }
+      // 重置初始化標誌
+      isInitializingRef.current = false;
     };
   }, [terminalId, shell, cwd]);
 

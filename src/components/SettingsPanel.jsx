@@ -12,16 +12,27 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
 
   useEffect(() => {
     // 從 localStorage 載入設定
-    const savedSettings = localStorage.getItem('terminalSettings');
-    if (savedSettings) {
-      setSettings(JSON.parse(savedSettings));
+    try {
+      const savedSettings = localStorage.getItem('terminalSettings');
+      if (savedSettings) {
+        setSettings(JSON.parse(savedSettings));
+      }
+    } catch (error) {
+      console.error('無法從 localStorage 載入設定:', error);
     }
   }, [isOpen]);
 
   const handleSave = () => {
-    localStorage.setItem('terminalSettings', JSON.stringify(settings));
-    onSave(settings);
-    onClose();
+    try {
+      localStorage.setItem('terminalSettings', JSON.stringify(settings));
+      onSave(settings);
+      onClose();
+    } catch (error) {
+      console.error('無法保存設定到 localStorage:', error);
+      // 即使保存失敗，也通知父組件設定已更改（至少在記憶體中生效）
+      onSave(settings);
+      onClose();
+    }
   };
 
   if (!isOpen) return null;

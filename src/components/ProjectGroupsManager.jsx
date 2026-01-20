@@ -10,23 +10,36 @@ export default function ProjectGroupsManager({ isOpen, onClose, onOpenGroup }) {
   // 載入項目組和最近路徑
   useEffect(() => {
     if (isOpen) {
-      const savedGroups = localStorage.getItem('projectGroups');
-      const savedPaths = localStorage.getItem('recentPaths');
-
-      if (savedGroups) {
-        setProjectGroups(JSON.parse(savedGroups));
+      try {
+        const savedGroups = localStorage.getItem('projectGroups');
+        if (savedGroups) {
+          setProjectGroups(JSON.parse(savedGroups));
+        }
+      } catch (error) {
+        console.error('無法從 localStorage 載入項目組:', error);
       }
 
-      if (savedPaths) {
-        setRecentPaths(JSON.parse(savedPaths));
+      try {
+        const savedPaths = localStorage.getItem('recentPaths');
+        if (savedPaths) {
+          setRecentPaths(JSON.parse(savedPaths));
+        }
+      } catch (error) {
+        console.error('無法從 localStorage 載入最近路徑:', error);
       }
     }
   }, [isOpen]);
 
   // 儲存項目組到 localStorage
   const saveProjectGroups = (groups) => {
-    localStorage.setItem('projectGroups', JSON.stringify(groups));
-    setProjectGroups(groups);
+    try {
+      localStorage.setItem('projectGroups', JSON.stringify(groups));
+      setProjectGroups(groups);
+    } catch (error) {
+      console.error('無法保存項目組到 localStorage:', error);
+      // 即使保存失敗，也更新記憶體中的狀態
+      setProjectGroups(groups);
+    }
   };
 
   // 新建項目組

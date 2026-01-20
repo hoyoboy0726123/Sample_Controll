@@ -19,6 +19,9 @@ export function useTerminal(terminalId, shell, cwd) {
     let resizeObserver = null;
     let isInitialized = false;
     let initTimer = null;
+    let cleanupTerminalData = null;
+    let cleanupTerminalExit = null;
+    let resizeHandler = null;
 
     // 等待 DOM 元素有有效尺寸後再初始化
     const checkAndInitialize = () => {
@@ -91,15 +94,15 @@ export function useTerminal(terminalId, shell, cwd) {
           setIsReady(true);
         });
 
-        // 监听终端数据
-        window.electronAPI.onTerminalData((id, data) => {
+        // 监听终端数据 - 保存清理函數
+        cleanupTerminalData = window.electronAPI.onTerminalData((id, data) => {
           if (id === terminalId && xtermRef.current) {
             xtermRef.current.write(data);
           }
         });
 
-        // 监听终端退出
-        window.electronAPI.onTerminalExit((id, code) => {
+        // 监听终端退出 - 保存清理函數
+        cleanupTerminalExit = window.electronAPI.onTerminalExit((id, code) => {
           if (id === terminalId && xtermRef.current) {
             xtermRef.current.write(`\r\n\x1b[31mProcess exited with code ${code}\x1b[0m\r\n`);
           }
@@ -112,7 +115,7 @@ export function useTerminal(terminalId, shell, cwd) {
       }
 
       // 窗口大小改变时自适应
-      const handleResize = () => {
+      resizeHandler = () => {
         if (!fitAddonRef.current || !xtermRef.current || !terminalRef.current) {
           return;
         }
@@ -130,8 +133,9 @@ export function useTerminal(terminalId, shell, cwd) {
         }
       };
 
-      window.addEventListener('resize', handleResize);
-      resizeObserver = new ResizeObserver(handleResize);
+      // 保存 resizeHandler 引用以便清理
+      window.addEventListener('resize', resizeHandler);
+      resizeObserver = new ResizeObserver(resizeHandler);
       if (terminalRef.current) {
         resizeObserver.observe(terminalRef.current);
       }
@@ -148,20 +152,40 @@ export function useTerminal(terminalId, shell, cwd) {
 
     // 清理
     return () => {
+      // 清理計時器
       if (initTimer) {
         clearTimeout(initTimer);
       }
-      window.removeEventListener('resize', () => {});
+
+      // 清理 window resize 監聽器（使用保存的引用）
+      if (resizeHandler) {
+        window.removeEventListener('resize', resizeHandler);
+      }
+
+      // 清理 ResizeObserver
       if (resizeObserver) {
         resizeObserver.disconnect();
       }
+
+      // 清理 IPC 監聽器
+      if (cleanupTerminalData) {
+        cleanupTerminalData();
+      }
+      if (cleanupTerminalExit) {
+        cleanupTerminalExit();
+      }
+
+      // 清理 xterm 實例
       if (xtermRef.current) {
         xtermRef.current.dispose();
         xtermRef.current = null;
       }
+
+      // 關閉終端
       if (window.electronAPI) {
         window.electronAPI.closeTerminal(terminalId);
       }
+
       // 重置初始化標誌
       isInitializingRef.current = false;
     };

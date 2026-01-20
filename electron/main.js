@@ -21,6 +21,24 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
+      /**
+       * 安全性評估結果：sandbox 必須設為 false
+       *
+       * 原因：
+       * 1. node-pty 需要原生 Node.js 模組支援，無法在沙箱環境中運行
+       * 2. Preload 腳本需要訪問 ipcRenderer 來建立 contextBridge
+       *
+       * 安全緩解措施：
+       * 1. ✓ nodeIntegration: false - 防止渲染進程直接訪問 Node.js API
+       * 2. ✓ contextIsolation: true - 隔離 preload 腳本和渲染進程的上下文
+       * 3. ✓ contextBridge - 只暴露明確定義的安全 API (electronAPI)
+       * 4. ✓ IPC 驗證 - 所有 IPC 通信都經過 main 進程驗證
+       * 5. ✓ 最小權限原則 - preload.cjs 只暴露必要的終端管理功能
+       *
+       * 風險評估：中等風險
+       * - 如果渲染進程被 XSS 攻擊，攻擊者可以透過 electronAPI 執行終端指令
+       * - 建議未來添加指令白名單或更嚴格的輸入驗證
+       */
       sandbox: false
     },
     frame: true,
@@ -72,10 +90,45 @@ app.on('window-all-closed', () => {
   }
 });
 
+// IPC 輸入驗證輔助函數
+function validateTerminalId(id) {
+  return typeof id === 'string' && id.length > 0 && id.length < 256;
+}
+
+function validateString(value, maxLength = 10000) {
+  return typeof value === 'string' && value.length <= maxLength;
+}
+
+function validatePositiveInteger(value) {
+  return Number.isInteger(value) && value > 0;
+}
+
+function validateObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 // IPC 通信处理 - 创建终端
 ipcMain.handle('terminal:create', async (event, options) => {
   try {
+    // 輸入驗證
+    if (!validateObject(options)) {
+      return { success: false, error: 'Invalid options: must be an object' };
+    }
+
     const { id, cwd, shell } = options;
+
+    if (!validateTerminalId(id)) {
+      return { success: false, error: 'Invalid terminal id: must be a non-empty string (max 255 chars)' };
+    }
+
+    if (cwd !== undefined && !validateString(cwd, 4096)) {
+      return { success: false, error: 'Invalid cwd: must be a string (max 4096 chars)' };
+    }
+
+    if (shell !== undefined && !validateString(shell, 1024)) {
+      return { success: false, error: 'Invalid shell: must be a string (max 1024 chars)' };
+    }
+
     ptyService.createTerminal(id, {
       cwd: cwd || process.env.HOME || process.env.USERPROFILE,
       shell: shell || 'auto'
@@ -88,28 +141,86 @@ ipcMain.handle('terminal:create', async (event, options) => {
 });
 
 // IPC 通信处理 - 写入终端数据
-ipcMain.on('terminal:write', (event, { id, data }) => {
+ipcMain.on('terminal:write', (event, payload) => {
+  // 輸入驗證
+  if (!validateObject(payload)) {
+    console.error('Invalid payload for terminal:write: must be an object');
+    return;
+  }
+
+  const { id, data } = payload;
+
+  if (!validateTerminalId(id)) {
+    console.error('Invalid terminal id for terminal:write');
+    return;
+  }
+
+  if (!validateString(data, 100000)) {
+    console.error('Invalid data for terminal:write: must be a string (max 100000 chars)');
+    return;
+  }
+
   ptyService.write(id, data);
 });
 
 // IPC 通信处理 - 调整终端大小
-ipcMain.on('terminal:resize', (event, { id, cols, rows }) => {
+ipcMain.on('terminal:resize', (event, payload) => {
+  // 輸入驗證
+  if (!validateObject(payload)) {
+    console.error('Invalid payload for terminal:resize: must be an object');
+    return;
+  }
+
+  const { id, cols, rows } = payload;
+
+  if (!validateTerminalId(id)) {
+    console.error('Invalid terminal id for terminal:resize');
+    return;
+  }
+
+  if (!validatePositiveInteger(cols) || cols > 1000) {
+    console.error('Invalid cols for terminal:resize: must be a positive integer (max 1000)');
+    return;
+  }
+
+  if (!validatePositiveInteger(rows) || rows > 1000) {
+    console.error('Invalid rows for terminal:resize: must be a positive integer (max 1000)');
+    return;
+  }
+
   ptyService.resize(id, cols, rows);
 });
 
 // IPC 通信处理 - 关闭终端
-ipcMain.on('terminal:close', (event, { id }) => {
+ipcMain.on('terminal:close', (event, payload) => {
+  // 輸入驗證
+  if (!validateObject(payload)) {
+    console.error('Invalid payload for terminal:close: must be an object');
+    return;
+  }
+
+  const { id } = payload;
+
+  if (!validateTerminalId(id)) {
+    console.error('Invalid terminal id for terminal:close');
+    return;
+  }
+
   ptyService.closeTerminal(id);
 });
 
 // 将 PTY 输出发送到渲染进程
+// 注意: onData 和 onExit 返回清理函數，但在此應用中回調應存在於整個應用生命週期
+// 如果需要清理，可以保存返回的函數並在適當時候調用:
+// const cleanupData = ptyService.onData(...);
+// const cleanupExit = ptyService.onExit(...);
+// 然後在需要時調用: cleanupData(); cleanupExit();
 ptyService.onData((id, data) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('terminal:data', { id, data });
   }
 });
 
-// 终端退出事件
 ptyService.onExit((id, code) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('terminal:exit', { id, code });

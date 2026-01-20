@@ -91,90 +91,173 @@ export function createPtyService() {
   return {
     // 创建终端
     createTerminal(id, options = {}) {
-      if (terminals.has(id)) {
-        throw new Error(`Terminal with id ${id} already exists`);
+      try {
+        if (terminals.has(id)) {
+          throw new Error(`Terminal with id ${id} already exists`);
+        }
+
+        const shell = resolveShell(options.shell);
+        const cwd = options.cwd || process.env.HOME || process.env.USERPROFILE || os.homedir();
+
+        // 驗證工作目錄是否存在且可訪問
+        if (cwd) {
+          try {
+            const stats = fs.statSync(cwd);
+            if (!stats.isDirectory()) {
+              throw new Error(`Working directory is not a directory: ${cwd}`);
+            }
+          } catch (error) {
+            console.error(`Invalid working directory: ${cwd}`, error.message);
+            throw new Error(`Cannot access working directory: ${cwd}`);
+          }
+        }
+
+        console.log(`Creating terminal ${id}:`);
+        console.log(`  Shell option: ${options.shell}`);
+        console.log(`  Resolved shell: ${shell}`);
+        console.log(`  Working directory: ${cwd}`);
+
+        const ptyProcess = pty.spawn(shell, [], {
+          name: 'xterm-256color',
+          cols: options.cols || 80,
+          rows: options.rows || 24,
+          cwd,
+          env: {
+            ...process.env,
+            TERM: 'xterm-256color',
+            COLORTERM: 'truecolor',
+            // 禁用 ConPTY 的控制台進程列表獲取，避免 AttachConsole 錯誤
+            NODE_PTY_USE_LEGACY: '0'
+          },
+          // Windows 特定選項
+          useConpty: true,
+          conptyInheritCursor: false
+        });
+
+        // 监听数据输出
+        ptyProcess.onData((data) => {
+          try {
+            dataCallbacks.forEach(callback => callback(id, data));
+          } catch (error) {
+            console.error(`Error in data callback for terminal ${id}:`, error);
+          }
+        });
+
+        // 监听进程退出
+        ptyProcess.onExit(({ exitCode, signal }) => {
+          try {
+            exitCallbacks.forEach(callback => callback(id, exitCode));
+          } catch (error) {
+            console.error(`Error in exit callback for terminal ${id}:`, error);
+          } finally {
+            terminals.delete(id);
+          }
+        });
+
+        terminals.set(id, ptyProcess);
+        console.log(`Terminal created: ${id}, shell: ${shell}, cwd: ${cwd}`);
+
+        return ptyProcess;
+      } catch (error) {
+        console.error(`Failed to create terminal ${id}:`, error);
+        // 確保清理任何部分創建的資源
+        if (terminals.has(id)) {
+          terminals.delete(id);
+        }
+        throw error;
       }
-
-      const shell = resolveShell(options.shell);
-      const cwd = options.cwd || process.env.HOME || process.env.USERPROFILE || os.homedir();
-
-      console.log(`Creating terminal ${id}:`);
-      console.log(`  Shell option: ${options.shell}`);
-      console.log(`  Resolved shell: ${shell}`);
-      console.log(`  Working directory: ${cwd}`);
-
-      const ptyProcess = pty.spawn(shell, [], {
-        name: 'xterm-256color',
-        cols: options.cols || 80,
-        rows: options.rows || 24,
-        cwd,
-        env: {
-          ...process.env,
-          TERM: 'xterm-256color',
-          COLORTERM: 'truecolor',
-          // 禁用 ConPTY 的控制台進程列表獲取，避免 AttachConsole 錯誤
-          NODE_PTY_USE_LEGACY: '0'
-        },
-        // Windows 特定選項
-        useConpty: true,
-        conptyInheritCursor: false
-      });
-
-      // 监听数据输出
-      ptyProcess.onData((data) => {
-        dataCallbacks.forEach(callback => callback(id, data));
-      });
-
-      // 监听进程退出
-      ptyProcess.onExit(({ exitCode, signal }) => {
-        exitCallbacks.forEach(callback => callback(id, exitCode));
-        terminals.delete(id);
-      });
-
-      terminals.set(id, ptyProcess);
-      console.log(`Terminal created: ${id}, shell: ${shell}, cwd: ${cwd}`);
-
-      return ptyProcess;
     },
 
     // 写入数据到终端
     write(id, data) {
-      const terminal = terminals.get(id);
-      if (terminal) {
+      try {
+        const terminal = terminals.get(id);
+        if (!terminal) {
+          console.warn(`Terminal ${id} not found for write operation`);
+          return false;
+        }
         terminal.write(data);
-      } else {
-        console.warn(`Terminal ${id} not found`);
+        return true;
+      } catch (error) {
+        console.error(`Failed to write to terminal ${id}:`, error);
+        return false;
       }
     },
 
     // 调整终端大小
     resize(id, cols, rows) {
-      const terminal = terminals.get(id);
-      if (terminal) {
+      try {
+        const terminal = terminals.get(id);
+        if (!terminal) {
+          console.warn(`Terminal ${id} not found for resize operation`);
+          return false;
+        }
+
+        // 驗證尺寸參數
+        if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols <= 0 || rows <= 0) {
+          console.error(`Invalid terminal dimensions: cols=${cols}, rows=${rows}`);
+          return false;
+        }
+
         terminal.resize(cols, rows);
-      } else {
-        console.warn(`Terminal ${id} not found`);
+        return true;
+      } catch (error) {
+        console.error(`Failed to resize terminal ${id}:`, error);
+        return false;
       }
     },
 
     // 关闭终端
     closeTerminal(id) {
-      const terminal = terminals.get(id);
-      if (terminal) {
+      try {
+        const terminal = terminals.get(id);
+        if (!terminal) {
+          console.warn(`Terminal ${id} not found for close operation`);
+          return false;
+        }
+
         terminal.kill();
         terminals.delete(id);
         console.log(`Terminal closed: ${id}`);
+        return true;
+      } catch (error) {
+        console.error(`Failed to close terminal ${id}:`, error);
+        // 即使 kill() 失敗，也嘗試從 Map 中移除
+        terminals.delete(id);
+        return false;
       }
     },
 
-    // 注册数据回调
+    // 注册数据回调 - 返回清理函數
     onData(callback) {
+      if (typeof callback !== 'function') {
+        throw new TypeError('Callback must be a function');
+      }
       dataCallbacks.push(callback);
+
+      // 返回清理函數
+      return () => {
+        const index = dataCallbacks.indexOf(callback);
+        if (index > -1) {
+          dataCallbacks.splice(index, 1);
+        }
+      };
     },
 
-    // 注册退出回调
+    // 注册退出回调 - 返回清理函數
     onExit(callback) {
+      if (typeof callback !== 'function') {
+        throw new TypeError('Callback must be a function');
+      }
       exitCallbacks.push(callback);
+
+      // 返回清理函數
+      return () => {
+        const index = exitCallbacks.indexOf(callback);
+        if (index > -1) {
+          exitCallbacks.splice(index, 1);
+        }
+      };
     },
 
     // 获取所有终端

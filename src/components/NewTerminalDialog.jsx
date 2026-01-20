@@ -19,9 +19,15 @@ export default function NewTerminalDialog({ isOpen, onClose, onConfirm, defaultS
   const handleConfirm = () => {
     // 保存最近使用的路徑
     if (selectedPath) {
-      const recentPaths = JSON.parse(localStorage.getItem('recentPaths') || '[]');
-      const updated = [selectedPath, ...recentPaths.filter(p => p !== selectedPath)].slice(0, 10);
-      localStorage.setItem('recentPaths', JSON.stringify(updated));
+      try {
+        const recentPathsStr = localStorage.getItem('recentPaths') || '[]';
+        const recentPaths = JSON.parse(recentPathsStr);
+        const updated = [selectedPath, ...recentPaths.filter(p => p !== selectedPath)].slice(0, 10);
+        localStorage.setItem('recentPaths', JSON.stringify(updated));
+      } catch (error) {
+        console.error('無法保存最近路徑到 localStorage:', error);
+        // 保存失敗不影響終端創建，繼續執行
+      }
     }
 
     onConfirm({

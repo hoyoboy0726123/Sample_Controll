@@ -14,18 +14,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 关闭终端
   closeTerminal: (id) => ipcRenderer.send('terminal:close', { id }),
 
-  // 监听终端数据
+  // 监听终端数据 - 返回清理函數
   onTerminalData: (callback) => {
-    ipcRenderer.on('terminal:data', (event, { id, data }) => callback(id, data));
+    const handler = (event, { id, data }) => callback(id, data);
+    ipcRenderer.on('terminal:data', handler);
+    // 返回清理函數
+    return () => ipcRenderer.removeListener('terminal:data', handler);
   },
 
-  // 监听终端退出
+  // 监听终端退出 - 返回清理函數
   onTerminalExit: (callback) => {
-    ipcRenderer.on('terminal:exit', (event, { id, code }) => callback(id, code));
+    const handler = (event, { id, code }) => callback(id, code);
+    ipcRenderer.on('terminal:exit', handler);
+    // 返回清理函數
+    return () => ipcRenderer.removeListener('terminal:exit', handler);
   },
 
-  // 移除监听器
-  removeListener: (channel) => {
+  // 移除所有监听器（保留向後兼容）
+  removeAllListeners: (channel) => {
     ipcRenderer.removeAllListeners(channel);
   },
 

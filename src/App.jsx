@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import TabBar from './components/TabBar';
 import Terminal from './components/Terminal';
 import SplitView from './components/SplitView';
@@ -7,9 +7,10 @@ import SettingsPanel from './components/SettingsPanel';
 import ProjectGroupsManager from './components/ProjectGroupsManager';
 import { Settings, Moon, Sun, FolderOpen } from 'lucide-react';
 
-let terminalIdCounter = 0;
-
 function App() {
+  // 使用 useRef 而非模組級變量，避免競態條件
+  const terminalIdCounterRef = useRef(0);
+
   const [tabs, setTabs] = useState([]);
   const [activeTabId, setActiveTabId] = useState(null);
   const [splitMode, setSplitMode] = useState(false);
@@ -28,7 +29,13 @@ function App() {
   // 載入設定並恢復會話
   useEffect(() => {
     // 先載入設定
-    const savedSettings = localStorage.getItem('terminalSettings');
+    let savedSettings = null;
+    try {
+      savedSettings = localStorage.getItem('terminalSettings');
+    } catch (error) {
+      console.error('無法訪問 localStorage (terminalSettings):', error);
+    }
+
     let shouldRestoreSession = false; // 預設關閉
 
     if (savedSettings) {
@@ -44,7 +51,12 @@ function App() {
 
     // 根據設定決定是否恢復會話
     if (shouldRestoreSession) {
-      const savedSession = localStorage.getItem('lastSession');
+      let savedSession = null;
+      try {
+        savedSession = localStorage.getItem('lastSession');
+      } catch (error) {
+        console.error('無法訪問 localStorage (lastSession):', error);
+      }
 
       if (savedSession) {
         try {
@@ -52,7 +64,7 @@ function App() {
 
           // 恢復終端機計數器
           if (session.terminalIdCounter) {
-            terminalIdCounter = session.terminalIdCounter;
+            terminalIdCounterRef.current = session.terminalIdCounter;
           }
 
           // 恢復所有終端機標籤
@@ -69,7 +81,8 @@ function App() {
 
     // 如果不恢復會話、沒有保存的會話或恢復失敗，創建新終端機
     createNewTab();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // 只在掛載時執行一次，不需要依賴 createNewTab
 
   // 自動保存會話（當終端機標籤改變時）
   useEffect(() => {
@@ -78,41 +91,58 @@ function App() {
       const session = {
         tabs,
         activeTabId,
-        terminalIdCounter,
+        terminalIdCounter: terminalIdCounterRef.current,
         timestamp: Date.now()
       };
 
-      localStorage.setItem('lastSession', JSON.stringify(session));
+      try {
+        localStorage.setItem('lastSession', JSON.stringify(session));
+      } catch (error) {
+        // 可能是 QuotaExceededError 或 localStorage 不可用
+        console.error('無法保存會話到 localStorage:', error);
+        if (error.name === 'QuotaExceededError') {
+          console.warn('localStorage 空間已滿，嘗試清理舊數據');
+          try {
+            // 嘗試清除舊的會話數據並重試
+            localStorage.removeItem('lastSession');
+            localStorage.setItem('lastSession', JSON.stringify(session));
+          } catch (retryError) {
+            console.error('清理後仍無法保存:', retryError);
+          }
+        }
+      }
     }
   }, [tabs, activeTabId]);
 
   // 创建新标签页
   const createNewTab = useCallback((options = {}) => {
-    // 添加短暫延遲，確保之前的終端資源已完全釋放
-    const doCreate = () => {
-      const id = `terminal-${terminalIdCounter++}`;
-      const shell = options.shell === 'auto' || !options.shell
-        ? (settings.defaultShell === 'auto' ? undefined : settings.defaultShell)
-        : options.shell;
+    const id = `terminal-${terminalIdCounterRef.current++}`;
+    const shell = options.shell === 'auto' || !options.shell
+      ? (settings.defaultShell === 'auto' ? undefined : settings.defaultShell)
+      : options.shell;
 
-      const newTab = {
-        id,
-        title: `Terminal ${terminalIdCounter}`,
-        shell,
-        cwd: options.cwd,
-      };
-
-      setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(id);
+    const newTab = {
+      id,
+      title: `Terminal ${terminalIdCounterRef.current}`,
+      shell,
+      cwd: options.cwd,
     };
 
-    // 如果當前有標籤正在關閉或創建，添加 150ms 延遲避免資源衝突
-    if (tabs.length > 0 && options.cwd) {
-      setTimeout(doCreate, 150);
-    } else {
-      doCreate();
-    }
-  }, [settings.defaultShell, tabs.length]);
+    // 使用函數式更新，不需要依賴 tabs
+    setTabs((prev) => {
+      // 如果當前有標籤且指定了 cwd，添加延遲避免資源衝突
+      if (prev.length > 0 && options.cwd) {
+        setTimeout(() => {
+          setTabs(current => [...current, newTab]);
+          setActiveTabId(id);
+        }, 150);
+        return prev; // 返回當前狀態，延遲更新在 setTimeout 中
+      }
+      // 否則立即更新
+      setActiveTabId(id);
+      return [...prev, newTab];
+    });
+  }, [settings.defaultShell]);
 
   // 显示新建终端对话框
   const handleNewTabClick = useCallback(() => {

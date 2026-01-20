@@ -111,9 +111,11 @@ export function createPtyService() {
         env: {
           ...process.env,
           TERM: 'xterm-256color',
-          COLORTERM: 'truecolor'
+          COLORTERM: 'truecolor',
+          // 禁用 ConPTY 的控制台進程列表獲取，避免 AttachConsole 錯誤
+          NODE_PTY_USE_LEGACY: '0'
         },
-        // Windows 特定選項：避免 AttachConsole 錯誤
+        // Windows 特定選項
         useConpty: true,
         conptyInheritCursor: false
       });

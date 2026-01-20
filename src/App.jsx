@@ -88,21 +88,31 @@ function App() {
 
   // 创建新标签页
   const createNewTab = useCallback((options = {}) => {
-    const id = `terminal-${terminalIdCounter++}`;
-    const shell = options.shell === 'auto' || !options.shell
-      ? (settings.defaultShell === 'auto' ? undefined : settings.defaultShell)
-      : options.shell;
+    // 添加短暫延遲，確保之前的終端資源已完全釋放
+    const doCreate = () => {
+      const id = `terminal-${terminalIdCounter++}`;
+      const shell = options.shell === 'auto' || !options.shell
+        ? (settings.defaultShell === 'auto' ? undefined : settings.defaultShell)
+        : options.shell;
 
-    const newTab = {
-      id,
-      title: `Terminal ${terminalIdCounter}`,
-      shell,
-      cwd: options.cwd,
+      const newTab = {
+        id,
+        title: `Terminal ${terminalIdCounter}`,
+        shell,
+        cwd: options.cwd,
+      };
+
+      setTabs((prev) => [...prev, newTab]);
+      setActiveTabId(id);
     };
 
-    setTabs((prev) => [...prev, newTab]);
-    setActiveTabId(id);
-  }, [settings.defaultShell]);
+    // 如果當前有標籤正在關閉或創建，添加 150ms 延遲避免資源衝突
+    if (tabs.length > 0 && options.cwd) {
+      setTimeout(doCreate, 150);
+    } else {
+      doCreate();
+    }
+  }, [settings.defaultShell, tabs.length]);
 
   // 显示新建终端对话框
   const handleNewTabClick = useCallback(() => {

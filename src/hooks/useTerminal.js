@@ -73,7 +73,7 @@ export function useTerminal(terminalId, shell, cwd) {
     if (window.electronAPI) {
       window.electronAPI.createTerminal({
         id: terminalId,
-        cwd: cwd || process.env.HOME || process.env.USERPROFILE,
+        cwd: cwd || undefined,
         shell: shell,
       }).then(() => {
         setIsReady(true);

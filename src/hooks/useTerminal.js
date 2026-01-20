@@ -90,16 +90,25 @@ export function useTerminal(terminalId, shell, cwd) {
 
     // 窗口大小改变时自适应
     const handleResize = () => {
-      if (fitAddonRef.current && xtermRef.current && terminalRef.current) {
-        try {
-          fitAddonRef.current.fit();
-          const dims = fitAddonRef.current.proposeDimensions();
-          if (dims && window.electronAPI) {
-            window.electronAPI.resizeTerminal(terminalId, dims.cols, dims.rows);
-          }
-        } catch (e) {
-          console.warn('Failed to fit terminal on resize:', e);
+      if (!fitAddonRef.current || !xtermRef.current || !terminalRef.current) {
+        return;
+      }
+
+      // 检查 xterm 的内部状态是否准备好
+      const xterm = xtermRef.current;
+      if (!xterm._core || !xterm._core.viewport) {
+        console.warn('Terminal viewport not ready yet');
+        return;
+      }
+
+      try {
+        fitAddonRef.current.fit();
+        const dims = fitAddonRef.current.proposeDimensions();
+        if (dims && window.electronAPI) {
+          window.electronAPI.resizeTerminal(terminalId, dims.cols, dims.rows);
         }
+      } catch (e) {
+        console.warn('Failed to fit terminal on resize:', e);
       }
     };
 
@@ -109,15 +118,14 @@ export function useTerminal(terminalId, shell, cwd) {
       resizeObserver.observe(terminalRef.current);
     }
 
-    // 初始化时调用一次 fit()，使用 requestAnimationFrame 确保 DOM 已渲染
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        handleResize();
-      });
-    });
+    // 初始化时延迟调用 fit()，确保 xterm 内部状态完全初始化
+    const initTimer = setTimeout(() => {
+      handleResize();
+    }, 100);
 
     // 清理
     return () => {
+      clearTimeout(initTimer);
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
       if (xtermRef.current) {

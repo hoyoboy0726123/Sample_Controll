@@ -31,7 +31,8 @@ function createWindow() {
   // 开发环境加载 Vite 开发服务器
   if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
     mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
+    // 註釋掉自動開啟 DevTools，用戶可以按 F12 手動開啟
+    // mainWindow.webContents.openDevTools();
   } else {
     // 生产环境加载打包后的文件
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));

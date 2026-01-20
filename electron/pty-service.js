@@ -112,7 +112,10 @@ export function createPtyService() {
           ...process.env,
           TERM: 'xterm-256color',
           COLORTERM: 'truecolor'
-        }
+        },
+        // Windows 特定選項：避免 AttachConsole 錯誤
+        useConpty: true,
+        conptyInheritCursor: false
       });
 
       // 监听数据输出

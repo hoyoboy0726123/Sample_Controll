@@ -22,21 +22,21 @@ function App() {
     fontSize: 14,
     fontFamily: 'Menlo, Monaco, "Courier New", monospace',
     theme: 'dark',
-    restoreSession: true,
+    restoreSession: false, // 默認關閉會話恢復，避免問題
   });
 
   // 載入設定並恢復會話
   useEffect(() => {
     // 先載入設定
     const savedSettings = localStorage.getItem('terminalSettings');
-    let shouldRestoreSession = true; // 預設啟用
+    let shouldRestoreSession = false; // 預設關閉
 
     if (savedSettings) {
       try {
         const parsed = JSON.parse(savedSettings);
         setSettings(parsed);
         setTheme(parsed.theme);
-        shouldRestoreSession = parsed.restoreSession !== false; // 如果設定中有值就使用，否則預設為 true
+        shouldRestoreSession = parsed.restoreSession === true; // 只有明確設定為 true 才恢復
       } catch (error) {
         console.error('載入設定失敗:', error);
       }

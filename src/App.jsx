@@ -26,6 +26,37 @@ function App() {
     restoreSession: false, // 默認關閉會話恢復，避免問題
   });
 
+  // 创建新标签页
+  const createNewTab = useCallback((options = {}) => {
+    const id = `terminal-${terminalIdCounterRef.current++}`;
+    const shell = options.shell === 'auto' || !options.shell
+      ? (settings.defaultShell === 'auto' ? undefined : settings.defaultShell)
+      : options.shell;
+
+    const newTab = {
+      id,
+      title: `Terminal ${terminalIdCounterRef.current}`,
+      shell,
+      cwd: options.cwd,
+      command: options.command, // 要在新終端執行的命令
+    };
+
+    // 使用函數式更新，不需要依賴 tabs
+    setTabs((prev) => {
+      // 如果當前有標籤且指定了 cwd，添加延遲避免資源衝突
+      if (prev.length > 0 && options.cwd) {
+        setTimeout(() => {
+          setTabs(current => [...current, newTab]);
+          setActiveTabId(id);
+        }, 150);
+        return prev; // 返回當前狀態，延遲更新在 setTimeout 中
+      }
+      // 否則立即更新
+      setActiveTabId(id);
+      return [...prev, newTab];
+    });
+  }, [settings.defaultShell]);
+
   // 載入設定並恢復會話
   useEffect(() => {
     // 先載入設定
@@ -133,37 +164,6 @@ function App() {
 
     return cleanup;
   }, [createNewTab]);
-
-  // 创建新标签页
-  const createNewTab = useCallback((options = {}) => {
-    const id = `terminal-${terminalIdCounterRef.current++}`;
-    const shell = options.shell === 'auto' || !options.shell
-      ? (settings.defaultShell === 'auto' ? undefined : settings.defaultShell)
-      : options.shell;
-
-    const newTab = {
-      id,
-      title: `Terminal ${terminalIdCounterRef.current}`,
-      shell,
-      cwd: options.cwd,
-      command: options.command, // 要在新終端執行的命令
-    };
-
-    // 使用函數式更新，不需要依賴 tabs
-    setTabs((prev) => {
-      // 如果當前有標籤且指定了 cwd，添加延遲避免資源衝突
-      if (prev.length > 0 && options.cwd) {
-        setTimeout(() => {
-          setTabs(current => [...current, newTab]);
-          setActiveTabId(id);
-        }, 150);
-        return prev; // 返回當前狀態，延遲更新在 setTimeout 中
-      }
-      // 否則立即更新
-      setActiveTabId(id);
-      return [...prev, newTab];
-    });
-  }, [settings.defaultShell]);
 
   // 显示新建终端对话框
   const handleNewTabClick = useCallback(() => {

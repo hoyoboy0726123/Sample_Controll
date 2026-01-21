@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Save } from 'lucide-react';
+import { X, Save, Trash2, AlertTriangle } from 'lucide-react';
 
 export default function SettingsPanel({ isOpen, onClose, onSave }) {
   const [settings, setSettings] = useState({
@@ -32,6 +32,45 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
       // 即使保存失敗，也通知父組件設定已更改（至少在記憶體中生效）
       onSave(settings);
       onClose();
+    }
+  };
+
+  const handleClearData = (dataType) => {
+    const confirmations = {
+      session: '確定要清除已保存的會話數據嗎？這將移除上次關閉時的所有終端機狀態。',
+      recentPaths: '確定要清除最近使用的路徑歷史記錄嗎？',
+      projectGroups: '確定要刪除所有項目群組嗎？',
+      all: '⚠️ 確定要清除所有數據嗎？\n\n這將刪除：\n• 已保存的會話\n• 最近路徑歷史\n• 所有項目群組\n\n（設定將會保留）'
+    };
+
+    if (confirm(confirmations[dataType])) {
+      try {
+        switch (dataType) {
+          case 'session':
+            localStorage.removeItem('lastSession');
+            alert('會話數據已清除');
+            break;
+          case 'recentPaths':
+            localStorage.removeItem('recentPaths');
+            alert('最近路徑已清除');
+            break;
+          case 'projectGroups':
+            localStorage.removeItem('projectGroups');
+            alert('項目群組已清除');
+            break;
+          case 'all':
+            const savedSettings = localStorage.getItem('terminalSettings');
+            localStorage.clear();
+            if (savedSettings) {
+              localStorage.setItem('terminalSettings', savedSettings);
+            }
+            alert('所有數據已清除（設定已保留）');
+            break;
+        }
+      } catch (error) {
+        console.error('清除數據時發生錯誤:', error);
+        alert('清除數據失敗，請查看控制台了解詳情');
+      }
     }
   };
 
@@ -184,6 +223,67 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
               <div className="flex justify-between">
                 <span className="text-gray-400">切換標籤</span>
                 <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + 1-9</kbd>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">開發者工具</span>
+                <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">F12</kbd>
+              </div>
+            </div>
+          </div>
+
+          {/* 數據管理 */}
+          <div>
+            <h3 className="text-lg font-medium text-white mb-3 flex items-center gap-2">
+              <AlertTriangle size={20} className="text-yellow-500" />
+              數據管理
+            </h3>
+            <div className="bg-[#1e1e1e] rounded p-4 space-y-3">
+              <p className="text-sm text-gray-400 mb-3">
+                清除保存在本地的數據。此操作無法復原，請謹慎使用。
+              </p>
+
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleClearData('session')}
+                  className="w-full px-3 py-2 bg-[#3c3c3c] text-gray-300 rounded
+                             hover:bg-[#4e4e4e] transition-colors text-sm flex items-center justify-between group"
+                >
+                  <span>清除會話數據</span>
+                  <Trash2 size={16} className="text-gray-500 group-hover:text-red-400" />
+                </button>
+
+                <button
+                  onClick={() => handleClearData('recentPaths')}
+                  className="w-full px-3 py-2 bg-[#3c3c3c] text-gray-300 rounded
+                             hover:bg-[#4e4e4e] transition-colors text-sm flex items-center justify-between group"
+                >
+                  <span>清除最近路徑</span>
+                  <Trash2 size={16} className="text-gray-500 group-hover:text-red-400" />
+                </button>
+
+                <button
+                  onClick={() => handleClearData('projectGroups')}
+                  className="w-full px-3 py-2 bg-[#3c3c3c] text-gray-300 rounded
+                             hover:bg-[#4e4e4e] transition-colors text-sm flex items-center justify-between group"
+                >
+                  <span>清除項目群組</span>
+                  <Trash2 size={16} className="text-gray-500 group-hover:text-red-400" />
+                </button>
+
+                <div className="pt-2 border-t border-[#3c3c3c]">
+                  <button
+                    onClick={() => handleClearData('all')}
+                    className="w-full px-3 py-2 bg-red-900/30 text-red-400 rounded
+                               hover:bg-red-900/50 transition-colors text-sm font-medium
+                               flex items-center justify-between group border border-red-900/50"
+                  >
+                    <span>清除所有數據（保留設定）</span>
+                    <Trash2 size={16} className="group-hover:animate-pulse" />
+                  </button>
+                  <p className="mt-2 text-xs text-gray-500">
+                    這將清除所有數據，但保留您的設定選項
+                  </p>
+                </div>
               </div>
             </div>
           </div>

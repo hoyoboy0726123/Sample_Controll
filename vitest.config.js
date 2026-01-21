@@ -1,13 +1,10 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import path from 'path';
-
-export default defineConfig({
-  plugins: [react()],
+// 簡化的 vitest 配置 - 使用內建 node 環境，不依賴外部包
+export default {
   test: {
     globals: true,
-    environment: 'happy-dom',
+    environment: 'node', // 使用內建 node 環境而非 happy-dom
     setupFiles: './tests/setup.js',
+    include: ['tests/**/*.test.js'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
@@ -19,9 +16,4 @@ export default defineConfig({
       ],
     },
   },
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-});
+};

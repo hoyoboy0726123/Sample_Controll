@@ -4,6 +4,13 @@ import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import 'xterm/css/xterm.css';
 
+// 🔒 驗證常數
+const VALIDATION = {
+  COMMAND_MAX_LENGTH: 10000,
+  SCROLLBACK_BUFFER: 10000,
+  COMMAND_EXEC_DELAY: 500, // ms
+};
+
 export function useTerminal(terminalId, shell, cwd, command) {
   const terminalRef = useRef(null);
   const xtermRef = useRef(null);
@@ -67,7 +74,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
           brightWhite: '#e5e5e5',
         },
         allowTransparency: true,
-        scrollback: 10000,
+        scrollback: VALIDATION.SCROLLBACK_BUFFER,
         rows: 24,
         cols: 80,
       });
@@ -108,8 +115,8 @@ export function useTerminal(terminalId, shell, cwd, command) {
                 }
 
                 // 長度限制：防止過長命令
-                if (command.length > 10000) {
-                  console.error('命令過長，已拒絕執行（最大 10000 字符）');
+                if (command.length > VALIDATION.COMMAND_MAX_LENGTH) {
+                  console.error(`命令過長，已拒絕執行（最大 ${VALIDATION.COMMAND_MAX_LENGTH} 字符）`);
                   return;
                 }
 
@@ -133,7 +140,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
                 // 發送命令加上 Enter 鍵
                 window.electronAPI.writeToTerminal(terminalId, command + '\r');
               }
-            }, 500); // 500ms 延遲確保終端準備好
+            }, VALIDATION.COMMAND_EXEC_DELAY); // 延遲確保終端準備好
           }
         });
 

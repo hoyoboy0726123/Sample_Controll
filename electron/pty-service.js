@@ -2,6 +2,7 @@ import pty from 'node-pty';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
+import logger from './logger.js';
 
 export function createPtyService() {
   const terminals = new Map();
@@ -116,13 +117,13 @@ export function createPtyService() {
             if (isShellAllowed(shellOption)) {
               return shellOption;
             } else {
-              console.warn(`⚠️ Shell 路徑不在白名單中，已拒絕: ${shellOption}`);
-              console.warn('使用默認 shell 代替');
+              logger.security(`⚠️ Shell 路徑不在白名單中，已拒絕: ${shellOption}`);
+              logger.warn('使用默認 shell 代替');
               return getDefaultShell();
             }
           }
           // 路徑不存在，使用默認 shell
-          console.warn(`Shell 不存在: ${shellOption}，使用默認 shell`);
+          logger.warn(`Shell 不存在: ${shellOption}，使用默認 shell`);
           return getDefaultShell();
       }
     }
@@ -141,20 +142,20 @@ export function createPtyService() {
           if (isShellAllowed(shellOption)) {
             return shellOption;
           } else {
-            console.warn(`⚠️ Shell 路徑不在白名單中，已拒絕: ${shellOption}`);
-            console.warn('使用默認 shell 代替');
+            logger.security(`⚠️ Shell 路徑不在白名單中，已拒絕: ${shellOption}`);
+            logger.warn('使用默認 shell 代替');
             return getDefaultShell();
           }
         }
         // 路徑不存在，使用默認 shell
-        console.warn(`Shell 不存在: ${shellOption}，使用默認 shell`);
+        logger.warn(`Shell 不存在: ${shellOption}，使用默認 shell`);
         return getDefaultShell();
     }
   };
 
   return {
-    // 创建终端
-    createTerminal(id, options = {}) {
+    // 创建终端 - 🔒 現在使用 async/await 來避免阻塞事件循環
+    async createTerminal(id, options = {}) {
       try {
         if (terminals.has(id)) {
           throw new Error(`Terminal with id ${id} already exists`);
@@ -168,15 +169,17 @@ export function createPtyService() {
         // 規範化路徑（解析相對路徑、移除 .. 等）
         cwd = path.resolve(cwd);
 
-        // 驗證工作目錄是否存在且可訪問
+        // 🔒 驗證工作目錄是否存在且可訪問（使用異步 API 避免阻塞）
         if (cwd) {
           try {
-            const stats = fs.statSync(cwd);
+            // 使用 fs.promises 代替 fs.statSync
+            const { promises: fsPromises } = await import('fs');
+            const stats = await fsPromises.stat(cwd);
             if (!stats.isDirectory()) {
               throw new Error(`Working directory is not a directory: ${cwd}`);
             }
           } catch (error) {
-            console.error(`Invalid working directory: ${cwd}`, error.message);
+            logger.error(`Invalid working directory: ${cwd}`, error.message);
             throw new Error(`Cannot access working directory: ${cwd}`);
           }
         }
@@ -188,14 +191,14 @@ export function createPtyService() {
         const isInSystemPaths = cwd.startsWith('/home') || cwd.startsWith('/Users') || /^[A-Z]:\\/i.test(cwd);
 
         if (!isInUserHome && !isInSystemPaths && cwd !== '/' && !cwd.startsWith('/tmp')) {
-          console.warn(`⚠️ Suspicious working directory (outside typical user paths): ${cwd}`);
+          logger.security(`⚠️ Suspicious working directory (outside typical user paths): ${cwd}`);
           // 不阻止，只記錄警告（可根據需求改為拒絕）
         }
 
-        console.log(`Creating terminal ${id}:`);
-        console.log(`  Shell option: ${options.shell}`);
-        console.log(`  Resolved shell: ${shell}`);
-        console.log(`  Working directory: ${cwd}`);
+        logger.log(`Creating terminal ${id}:`);
+        logger.log(`  Shell option: ${options.shell}`);
+        logger.log(`  Resolved shell: ${shell}`);
+        logger.log(`  Working directory: ${cwd}`);
 
         const ptyProcess = pty.spawn(shell, [], {
           name: 'xterm-256color',
@@ -216,30 +219,43 @@ export function createPtyService() {
 
         // 监听数据输出
         ptyProcess.onData((data) => {
-          try {
-            dataCallbacks.forEach(callback => callback(id, data));
-          } catch (error) {
-            console.error(`Error in data callback for terminal ${id}:`, error);
-          }
+          // 🔒 安全性：遍歷回調時分別處理錯誤，防止一個回調失敗影響其他回調
+          dataCallbacks.forEach(callback => {
+            try {
+              callback(id, data);
+            } catch (error) {
+              logger.error(`Error in data callback for terminal ${id}:`, error);
+              // 錯誤已記錄，繼續執行其他回調
+            }
+          });
         });
 
         // 监听进程退出
         ptyProcess.onExit(({ exitCode, signal }) => {
+          // 🔒 安全性：遍歷回調時分別處理錯誤，防止一個回調失敗影響其他回調
+          exitCallbacks.forEach(callback => {
+            try {
+              callback(id, exitCode);
+            } catch (error) {
+              logger.error(`Error in exit callback for terminal ${id}:`, error);
+              // 錯誤已記錄，繼續執行其他回調
+            }
+          });
+
+          // 清理終端資源（確保總是執行）
           try {
-            exitCallbacks.forEach(callback => callback(id, exitCode));
-          } catch (error) {
-            console.error(`Error in exit callback for terminal ${id}:`, error);
-          } finally {
             terminals.delete(id);
+          } catch (error) {
+            logger.error(`Error cleaning up terminal ${id}:`, error);
           }
         });
 
         terminals.set(id, ptyProcess);
-        console.log(`Terminal created: ${id}, shell: ${shell}, cwd: ${cwd}`);
+        logger.log(`Terminal created: ${id}, shell: ${shell}, cwd: ${cwd}`);
 
         return ptyProcess;
       } catch (error) {
-        console.error(`Failed to create terminal ${id}:`, error);
+        logger.error(`Failed to create terminal ${id}:`, error);
         // 確保清理任何部分創建的資源
         if (terminals.has(id)) {
           terminals.delete(id);
@@ -253,13 +269,13 @@ export function createPtyService() {
       try {
         const terminal = terminals.get(id);
         if (!terminal) {
-          console.warn(`Terminal ${id} not found for write operation`);
+          logger.warn(`Terminal ${id} not found for write operation`);
           return false;
         }
         terminal.write(data);
         return true;
       } catch (error) {
-        console.error(`Failed to write to terminal ${id}:`, error);
+        logger.error(`Failed to write to terminal ${id}:`, error);
         return false;
       }
     },
@@ -269,20 +285,20 @@ export function createPtyService() {
       try {
         const terminal = terminals.get(id);
         if (!terminal) {
-          console.warn(`Terminal ${id} not found for resize operation`);
+          logger.warn(`Terminal ${id} not found for resize operation`);
           return false;
         }
 
         // 驗證尺寸參數
         if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols <= 0 || rows <= 0) {
-          console.error(`Invalid terminal dimensions: cols=${cols}, rows=${rows}`);
+          logger.error(`Invalid terminal dimensions: cols=${cols}, rows=${rows}`);
           return false;
         }
 
         terminal.resize(cols, rows);
         return true;
       } catch (error) {
-        console.error(`Failed to resize terminal ${id}:`, error);
+        logger.error(`Failed to resize terminal ${id}:`, error);
         return false;
       }
     },
@@ -292,16 +308,16 @@ export function createPtyService() {
       try {
         const terminal = terminals.get(id);
         if (!terminal) {
-          console.warn(`Terminal ${id} not found for close operation`);
+          logger.warn(`Terminal ${id} not found for close operation`);
           return false;
         }
 
         terminal.kill();
         terminals.delete(id);
-        console.log(`Terminal closed: ${id}`);
+        logger.log(`Terminal closed: ${id}`);
         return true;
       } catch (error) {
-        console.error(`Failed to close terminal ${id}:`, error);
+        logger.error(`Failed to close terminal ${id}:`, error);
         // 即使 kill() 失敗，也嘗試從 Map 中移除
         terminals.delete(id);
         return false;

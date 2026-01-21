@@ -2,9 +2,22 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createPtyService } from './pty-service.js';
+import logger from './logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// 🔒 驗證常數 - 統一定義所有驗證限制
+const VALIDATION = {
+  TERMINAL_ID_MAX_LENGTH: 256,
+  STRING_MAX_LENGTH: 10000,
+  DATA_MAX_LENGTH: 100000,
+  CWD_MAX_LENGTH: 4096,
+  SHELL_MAX_LENGTH: 1024,
+  TERMINAL_MAX_COLS: 1000,
+  TERMINAL_MAX_ROWS: 1000,
+  COMMAND_DETECT_MAX_LENGTH: 5000,
+};
 
 let mainWindow;
 const ptyService = createPtyService();
@@ -119,7 +132,7 @@ app.on('window-all-closed', () => {
 
 // 🔒 應用退出前清理事件監聽器
 app.on('before-quit', () => {
-  console.log('清理事件監聽器...');
+  logger.log('清理事件監聽器...');
 
   // 清理 PTY 服務的事件監聽器
   if (cleanupDataCallback) {
@@ -135,10 +148,10 @@ app.on('before-quit', () => {
 
 // IPC 輸入驗證輔助函數
 function validateTerminalId(id) {
-  return typeof id === 'string' && id.length > 0 && id.length < 256;
+  return typeof id === 'string' && id.length > 0 && id.length < VALIDATION.TERMINAL_ID_MAX_LENGTH;
 }
 
-function validateString(value, maxLength = 10000) {
+function validateString(value, maxLength = VALIDATION.STRING_MAX_LENGTH) {
   return typeof value === 'string' && value.length <= maxLength;
 }
 
@@ -161,24 +174,24 @@ ipcMain.handle('terminal:create', async (event, options) => {
     const { id, cwd, shell } = options;
 
     if (!validateTerminalId(id)) {
-      return { success: false, error: 'Invalid terminal id: must be a non-empty string (max 255 chars)' };
+      return { success: false, error: `Invalid terminal id: must be a non-empty string (max ${VALIDATION.TERMINAL_ID_MAX_LENGTH} chars)` };
     }
 
-    if (cwd !== undefined && !validateString(cwd, 4096)) {
-      return { success: false, error: 'Invalid cwd: must be a string (max 4096 chars)' };
+    if (cwd !== undefined && !validateString(cwd, VALIDATION.CWD_MAX_LENGTH)) {
+      return { success: false, error: `Invalid cwd: must be a string (max ${VALIDATION.CWD_MAX_LENGTH} chars)` };
     }
 
-    if (shell !== undefined && !validateString(shell, 1024)) {
-      return { success: false, error: 'Invalid shell: must be a string (max 1024 chars)' };
+    if (shell !== undefined && !validateString(shell, VALIDATION.SHELL_MAX_LENGTH)) {
+      return { success: false, error: `Invalid shell: must be a string (max ${VALIDATION.SHELL_MAX_LENGTH} chars)` };
     }
 
-    ptyService.createTerminal(id, {
+    await ptyService.createTerminal(id, {
       cwd: cwd || process.env.HOME || process.env.USERPROFILE,
       shell: shell || 'auto'
     });
     return { success: true, id };
   } catch (error) {
-    console.error('Failed to create terminal:', error);
+    logger.error('Failed to create terminal:', error);
     return { success: false, error: error.message };
   }
 });
@@ -335,9 +348,9 @@ function detectNewTerminalCommand(data) {
     return { shouldIntercept: false };
   }
 
-  // 超過 5000 字符的命令不進行匹配（防止 ReDoS）
-  if (data.length > 5000) {
-    console.warn('命令過長，跳過檢測（防止 ReDoS）');
+  // 超過限制長度的命令不進行匹配（防止 ReDoS）
+  if (data.length > VALIDATION.COMMAND_DETECT_MAX_LENGTH) {
+    logger.security(`命令過長，跳過檢測（防止 ReDoS，最大 ${VALIDATION.COMMAND_DETECT_MAX_LENGTH} 字符）`);
     return { shouldIntercept: false };
   }
 
@@ -369,19 +382,19 @@ function detectNewTerminalCommand(data) {
 ipcMain.on('terminal:write', (event, payload) => {
   // 輸入驗證
   if (!validateObject(payload)) {
-    console.error('Invalid payload for terminal:write: must be an object');
+    logger.error('Invalid payload for terminal:write: must be an object');
     return;
   }
 
   const { id, data } = payload;
 
   if (!validateTerminalId(id)) {
-    console.error('Invalid terminal id for terminal:write');
+    logger.error('Invalid terminal id for terminal:write');
     return;
   }
 
-  if (!validateString(data, 100000)) {
-    console.error('Invalid data for terminal:write: must be a string (max 100000 chars)');
+  if (!validateString(data, VALIDATION.DATA_MAX_LENGTH)) {
+    logger.error(`Invalid data for terminal:write: must be a string (max ${VALIDATION.DATA_MAX_LENGTH} chars)`);
     return;
   }
 
@@ -389,12 +402,12 @@ ipcMain.on('terminal:write', (event, payload) => {
   const detection = detectNewTerminalCommand(data);
 
   if (detection.shouldIntercept) {
-    console.log(`攔截到開啟新終端指令: ${detection.name}`);
+    logger.log(`攔截到開啟新終端指令: ${detection.name}`);
     if (detection.command) {
-      console.log(`  要執行的命令: ${detection.command}`);
+      logger.log(`  要執行的命令: ${detection.command}`);
     }
     if (detection.cwd) {
-      console.log(`  工作目錄: ${detection.cwd}`);
+      logger.log(`  工作目錄: ${detection.cwd}`);
     }
 
     // 發送消息給渲染進程，在應用內創建新標籤
@@ -430,24 +443,24 @@ ipcMain.on('terminal:write', (event, payload) => {
 ipcMain.on('terminal:resize', (event, payload) => {
   // 輸入驗證
   if (!validateObject(payload)) {
-    console.error('Invalid payload for terminal:resize: must be an object');
+    logger.error('Invalid payload for terminal:resize: must be an object');
     return;
   }
 
   const { id, cols, rows } = payload;
 
   if (!validateTerminalId(id)) {
-    console.error('Invalid terminal id for terminal:resize');
+    logger.error('Invalid terminal id for terminal:resize');
     return;
   }
 
-  if (!validatePositiveInteger(cols) || cols > 1000) {
-    console.error('Invalid cols for terminal:resize: must be a positive integer (max 1000)');
+  if (!validatePositiveInteger(cols) || cols > VALIDATION.TERMINAL_MAX_COLS) {
+    logger.error(`Invalid cols for terminal:resize: must be a positive integer (max ${VALIDATION.TERMINAL_MAX_COLS})`);
     return;
   }
 
-  if (!validatePositiveInteger(rows) || rows > 1000) {
-    console.error('Invalid rows for terminal:resize: must be a positive integer (max 1000)');
+  if (!validatePositiveInteger(rows) || rows > VALIDATION.TERMINAL_MAX_ROWS) {
+    logger.error(`Invalid rows for terminal:resize: must be a positive integer (max ${VALIDATION.TERMINAL_MAX_ROWS})`);
     return;
   }
 
@@ -458,14 +471,14 @@ ipcMain.on('terminal:resize', (event, payload) => {
 ipcMain.on('terminal:close', (event, payload) => {
   // 輸入驗證
   if (!validateObject(payload)) {
-    console.error('Invalid payload for terminal:close: must be an object');
+    logger.error('Invalid payload for terminal:close: must be an object');
     return;
   }
 
   const { id } = payload;
 
   if (!validateTerminalId(id)) {
-    console.error('Invalid terminal id for terminal:close');
+    logger.error('Invalid terminal id for terminal:close');
     return;
   }
 
@@ -497,5 +510,19 @@ ipcMain.handle('dialog:selectFolder', async () => {
     return { canceled: true };
   }
 
-  return { canceled: false, path: result.filePaths[0] };
+  // 🔒 安全性：驗證返回的路徑
+  if (!result.filePaths || !Array.isArray(result.filePaths) || result.filePaths.length === 0) {
+    logger.error('dialog.showOpenDialog returned invalid filePaths');
+    return { canceled: true, error: 'No path selected' };
+  }
+
+  const selectedPath = result.filePaths[0];
+
+  // 驗證路徑是字符串且不為空
+  if (typeof selectedPath !== 'string' || selectedPath.length === 0) {
+    logger.error('Invalid path selected:', selectedPath);
+    return { canceled: true, error: 'Invalid path' };
+  }
+
+  return { canceled: false, path: selectedPath };
 });

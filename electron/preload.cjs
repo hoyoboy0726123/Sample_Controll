@@ -1,5 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+// 🔒 驗證常數
+const VALIDATION = {
+  TERMINAL_ID_MAX_LENGTH: 255,
+  DATA_MAX_LENGTH: 50000,  // 50KB
+  TERMINAL_MAX_COLS: 1000,
+  TERMINAL_MAX_ROWS: 1000,
+};
+
 // 暴露安全的 API 给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', {
   // 创建终端
@@ -8,15 +16,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 写入数据到终端
   writeToTerminal: (id, data) => {
     // 🔒 客戶端驗證：防止發送過大數據
-    if (typeof id !== 'string' || id.length === 0 || id.length > 255) {
-      throw new Error('Invalid terminal id');
+    if (typeof id !== 'string' || id.length === 0 || id.length > VALIDATION.TERMINAL_ID_MAX_LENGTH) {
+      throw new Error(`Invalid terminal id (max ${VALIDATION.TERMINAL_ID_MAX_LENGTH} chars)`);
     }
     if (typeof data !== 'string') {
       throw new Error('Data must be a string');
     }
-    if (data.length > 50000) {  // 降低到 50KB
-      console.warn('數據過大，已截斷（最大 50KB）');
-      data = data.substring(0, 50000);
+    if (data.length > VALIDATION.DATA_MAX_LENGTH) {
+      console.warn(`數據過大，已截斷（最大 ${VALIDATION.DATA_MAX_LENGTH / 1000}KB）`);
+      data = data.substring(0, VALIDATION.DATA_MAX_LENGTH);
     }
     return ipcRenderer.send('terminal:write', { id, data });
   },
@@ -24,14 +32,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // 调整终端大小
   resizeTerminal: (id, cols, rows) => {
     // 🔒 客戶端驗證：防止無效的終端大小
-    if (typeof id !== 'string' || id.length === 0 || id.length > 255) {
-      throw new Error('Invalid terminal id');
+    if (typeof id !== 'string' || id.length === 0 || id.length > VALIDATION.TERMINAL_ID_MAX_LENGTH) {
+      throw new Error(`Invalid terminal id (max ${VALIDATION.TERMINAL_ID_MAX_LENGTH} chars)`);
     }
-    if (!Number.isInteger(cols) || cols < 1 || cols > 1000) {
-      throw new Error('Invalid cols value (must be 1-1000)');
+    if (!Number.isInteger(cols) || cols < 1 || cols > VALIDATION.TERMINAL_MAX_COLS) {
+      throw new Error(`Invalid cols value (must be 1-${VALIDATION.TERMINAL_MAX_COLS})`);
     }
-    if (!Number.isInteger(rows) || rows < 1 || rows > 1000) {
-      throw new Error('Invalid rows value (must be 1-1000)');
+    if (!Number.isInteger(rows) || rows < 1 || rows > VALIDATION.TERMINAL_MAX_ROWS) {
+      throw new Error(`Invalid rows value (must be 1-${VALIDATION.TERMINAL_MAX_ROWS})`);
     }
     return ipcRenderer.send('terminal:resize', { id, cols, rows });
   },

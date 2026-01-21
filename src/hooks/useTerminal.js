@@ -4,12 +4,13 @@ import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import 'xterm/css/xterm.css';
 
-export function useTerminal(terminalId, shell, cwd) {
+export function useTerminal(terminalId, shell, cwd, command) {
   const terminalRef = useRef(null);
   const xtermRef = useRef(null);
   const fitAddonRef = useRef(null);
   const [isReady, setIsReady] = useState(false);
   const isInitializingRef = useRef(false);
+  const commandExecutedRef = useRef(false); // 追蹤命令是否已執行
 
   useEffect(() => {
     // 防止重複初始化
@@ -92,6 +93,20 @@ export function useTerminal(terminalId, shell, cwd) {
           shell: shell,
         }).then(() => {
           setIsReady(true);
+
+          // 如果有命令需要執行，在終端就緒後執行
+          if (command && !commandExecutedRef.current) {
+            commandExecutedRef.current = true;
+
+            // 延遲執行命令，確保終端完全初始化
+            setTimeout(() => {
+              if (window.electronAPI) {
+                console.log(`在終端 ${terminalId} 中執行命令: ${command}`);
+                // 發送命令加上 Enter 鍵
+                window.electronAPI.writeToTerminal(terminalId, command + '\r');
+              }
+            }, 500); // 500ms 延遲確保終端準備好
+          }
         });
 
         // 监听终端数据 - 保存清理函數

@@ -122,10 +122,12 @@ function App() {
 
     const cleanup = window.electronAPI.onRequestNewTab((options) => {
       console.log('收到新建標籤請求:', options);
-      // 使用指定的 shell 創建新標籤
+
+      // 使用指定的 shell、工作目錄和命令創建新標籤
       createNewTab({
         shell: options.shell || 'auto',
-        cwd: undefined // 使用默認工作目錄
+        cwd: options.cwd || undefined,
+        command: options.command || undefined // 要在新終端執行的命令
       });
     });
 
@@ -144,6 +146,7 @@ function App() {
       title: `Terminal ${terminalIdCounterRef.current}`,
       shell,
       cwd: options.cwd,
+      command: options.command, // 要在新終端執行的命令
     };
 
     // 使用函數式更新，不需要依賴 tabs
@@ -277,6 +280,7 @@ function App() {
                   id={tab.id}
                   shell={tab.shell}
                   cwd={tab.cwd}
+                  command={tab.command}
                   isActive={false}
                   onFocus={() => selectTab(tab.id)}
                 />
@@ -291,6 +295,7 @@ function App() {
               id={activeTab.id}
               shell={activeTab.shell}
               cwd={activeTab.cwd}
+              command={activeTab.command}
               isActive={true}
               onFocus={() => selectTab(activeTab.id)}
             />
@@ -299,6 +304,7 @@ function App() {
               id={nextTab.id}
               shell={nextTab.shell}
               cwd={nextTab.cwd}
+              command={nextTab.command}
               isActive={false}
               onFocus={() => selectTab(nextTab.id)}
             />
@@ -321,6 +327,7 @@ function App() {
               id={tab.id}
               shell={tab.shell}
               cwd={tab.cwd}
+              command={tab.command}
               isActive={tab.id === activeTabId}
               onFocus={() => selectTab(tab.id)}
             />

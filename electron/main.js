@@ -145,23 +145,122 @@ ipcMain.handle('terminal:create', async (event, options) => {
 function detectNewTerminalCommand(data) {
   const trimmed = data.trim();
 
-  // Windows 指令 - 只攔截會開啟新視窗的指令
-  const windowsCommands = [
-    // start 指令會開啟新視窗
-    { pattern: /^start\s+cmd\b/i, shell: 'cmd.exe', name: 'CMD' },
-    { pattern: /^start\s+powershell\b/i, shell: 'powershell.exe', name: 'PowerShell' },
-    { pattern: /^start\s+pwsh\b/i, shell: 'powershell.exe', name: 'PowerShell Core' },
+  // Windows 指令 - 解析並提取參數
+  // start cmd /k <command> - 執行命令後保持視窗開啟
+  const startCmdMatch = trimmed.match(/^start\s+cmd\s+\/k\s+(.+)/i);
+  if (startCmdMatch) {
+    return {
+      shouldIntercept: true,
+      shell: 'cmd.exe',
+      name: 'CMD',
+      command: startCmdMatch[1],
+      originalCommand: data
+    };
+  }
 
-    // wt (Windows Terminal) 會開啟新視窗或新標籤
-    { pattern: /^wt\b/i, shell: 'auto', name: 'Windows Terminal' },
-    { pattern: /^wt\.exe\b/i, shell: 'auto', name: 'Windows Terminal' },
+  // start cmd /c <command> - 執行命令後關閉視窗（通常不需要新視窗，但也處理）
+  const startCmdCMatch = trimmed.match(/^start\s+cmd\s+\/c\s+(.+)/i);
+  if (startCmdCMatch) {
+    return {
+      shouldIntercept: true,
+      shell: 'cmd.exe',
+      name: 'CMD',
+      command: startCmdCMatch[1],
+      originalCommand: data
+    };
+  }
 
-    // 明確的新視窗指令
-    { pattern: /^start\s+\".*?\"\s+cmd\b/i, shell: 'cmd.exe', name: 'CMD' },
-    { pattern: /^start\s+\".*?\"\s+powershell\b/i, shell: 'powershell.exe', name: 'PowerShell' },
-  ];
+  // start cmd (無參數)
+  if (/^start\s+cmd\b/i.test(trimmed)) {
+    return {
+      shouldIntercept: true,
+      shell: 'cmd.exe',
+      name: 'CMD',
+      originalCommand: data
+    };
+  }
 
-  // Linux/Mac 指令 - 這些通常都會開啟新視窗
+  // start powershell -NoExit -Command "<command>"
+  const startPsMatch = trimmed.match(/^start\s+powershell\s+(?:-NoExit\s+)?-Command\s+["'](.+?)["']/i);
+  if (startPsMatch) {
+    return {
+      shouldIntercept: true,
+      shell: 'powershell.exe',
+      name: 'PowerShell',
+      command: startPsMatch[1],
+      originalCommand: data
+    };
+  }
+
+  // start powershell (無參數)
+  if (/^start\s+powershell\b/i.test(trimmed)) {
+    return {
+      shouldIntercept: true,
+      shell: 'powershell.exe',
+      name: 'PowerShell',
+      originalCommand: data
+    };
+  }
+
+  // start pwsh
+  if (/^start\s+pwsh\b/i.test(trimmed)) {
+    return {
+      shouldIntercept: true,
+      shell: 'powershell.exe',
+      name: 'PowerShell Core',
+      originalCommand: data
+    };
+  }
+
+  // wt -d <directory> <command>
+  const wtDirMatch = trimmed.match(/^wt(?:\.exe)?\s+-d\s+(\S+)\s+(.+)/i);
+  if (wtDirMatch) {
+    return {
+      shouldIntercept: true,
+      shell: 'auto',
+      name: 'Windows Terminal',
+      cwd: wtDirMatch[1].replace(/['"]/g, ''), // 移除引號
+      command: wtDirMatch[2],
+      originalCommand: data
+    };
+  }
+
+  // wt <command>
+  const wtMatch = trimmed.match(/^wt(?:\.exe)?\s+(.+)/i);
+  if (wtMatch) {
+    return {
+      shouldIntercept: true,
+      shell: 'auto',
+      name: 'Windows Terminal',
+      command: wtMatch[1],
+      originalCommand: data
+    };
+  }
+
+  // wt (無參數)
+  if (/^wt(?:\.exe)?\s*$/i.test(trimmed)) {
+    return {
+      shouldIntercept: true,
+      shell: 'auto',
+      name: 'Windows Terminal',
+      originalCommand: data
+    };
+  }
+
+  // Linux/Mac 指令
+  // gnome-terminal -- <command>
+  const gnomeMatch = trimmed.match(/^gnome-terminal\s+--\s+(.+)/i);
+  if (gnomeMatch) {
+    return {
+      shouldIntercept: true,
+      shell: 'bash',
+      name: 'GNOME Terminal',
+      command: gnomeMatch[1],
+      originalCommand: data
+    };
+  }
+
+  // 其他 Linux 終端（基本支援）
   const unixCommands = [
     { pattern: /^gnome-terminal\b/i, shell: 'bash', name: 'GNOME Terminal' },
     { pattern: /^konsole\b/i, shell: 'bash', name: 'Konsole' },
@@ -171,9 +270,7 @@ function detectNewTerminalCommand(data) {
     { pattern: /^x-terminal-emulator\b/i, shell: 'bash', name: 'Terminal' },
   ];
 
-  const allCommands = [...windowsCommands, ...unixCommands];
-
-  for (const cmd of allCommands) {
+  for (const cmd of unixCommands) {
     if (cmd.pattern.test(trimmed)) {
       return {
         shouldIntercept: true,
@@ -218,11 +315,19 @@ ipcMain.on('terminal:write', (event, payload) => {
 
   if (detection.shouldIntercept) {
     console.log(`攔截到開啟新終端指令: ${detection.name}`);
+    if (detection.command) {
+      console.log(`  要執行的命令: ${detection.command}`);
+    }
+    if (detection.cwd) {
+      console.log(`  工作目錄: ${detection.cwd}`);
+    }
 
     // 發送消息給渲染進程，在應用內創建新標籤
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('terminal:request-new-tab', {
         shell: detection.shell,
+        command: detection.command,  // 要在新終端執行的命令
+        cwd: detection.cwd,          // 工作目錄
         fromCommand: true,
         commandName: detection.name
       });
@@ -230,7 +335,11 @@ ipcMain.on('terminal:write', (event, payload) => {
 
     // 向當前終端輸出提示訊息
     if (mainWindow && !mainWindow.isDestroyed()) {
-      const message = `\r\n\x1b[32m✓ 已在應用內開啟新的 ${detection.name} 標籤\x1b[0m\r\n`;
+      let message = `\r\n\x1b[32m✓ 已在應用內開啟新的 ${detection.name} 標籤\x1b[0m`;
+      if (detection.command) {
+        message += `\x1b[90m (執行: ${detection.command})\x1b[0m`;
+      }
+      message += '\r\n';
       mainWindow.webContents.send('terminal:data', { id, data: message });
     }
 

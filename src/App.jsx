@@ -114,6 +114,24 @@ function App() {
     }
   }, [tabs, activeTabId]);
 
+  // 監聽終端內的新標籤請求（從指令觸發）
+  useEffect(() => {
+    if (!window.electronAPI?.onRequestNewTab) {
+      return;
+    }
+
+    const cleanup = window.electronAPI.onRequestNewTab((options) => {
+      console.log('收到新建標籤請求:', options);
+      // 使用指定的 shell 創建新標籤
+      createNewTab({
+        shell: options.shell || 'auto',
+        cwd: undefined // 使用默認工作目錄
+      });
+    });
+
+    return cleanup;
+  }, [createNewTab]);
+
   // 创建新标签页
   const createNewTab = useCallback((options = {}) => {
     const id = `terminal-${terminalIdCounterRef.current++}`;

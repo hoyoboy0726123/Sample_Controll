@@ -35,6 +35,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners(channel);
   },
 
+  // 监听應用內新建標籤請求（從指令觸發）
+  onRequestNewTab: (callback) => {
+    const handler = (event, options) => callback(options);
+    ipcRenderer.on('terminal:request-new-tab', handler);
+    return () => ipcRenderer.removeListener('terminal:request-new-tab', handler);
+  },
+
   // 选择文件夹
   selectFolder: () => ipcRenderer.invoke('dialog:selectFolder')
 });

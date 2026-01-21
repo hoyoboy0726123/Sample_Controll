@@ -140,6 +140,44 @@ ipcMain.handle('terminal:create', async (event, options) => {
   }
 });
 
+// 檢測並攔截開啟新終端的指令
+function detectNewTerminalCommand(data) {
+  const trimmed = data.trim().toLowerCase();
+
+  // Windows 指令
+  const windowsCommands = [
+    { pattern: /^start\s+(cmd|powershell|pwsh)/i, shell: 'cmd.exe', name: 'CMD' },
+    { pattern: /^start\s+powershell/i, shell: 'powershell.exe', name: 'PowerShell' },
+    { pattern: /^wt\b/i, shell: 'auto', name: 'Windows Terminal' },
+    { pattern: /^cmd\s*$/i, shell: 'cmd.exe', name: 'CMD' },
+    { pattern: /^powershell\s*$/i, shell: 'powershell.exe', name: 'PowerShell' },
+  ];
+
+  // Linux/Mac 指令
+  const unixCommands = [
+    { pattern: /^gnome-terminal/i, shell: 'bash', name: 'GNOME Terminal' },
+    { pattern: /^konsole/i, shell: 'bash', name: 'Konsole' },
+    { pattern: /^xterm/i, shell: 'bash', name: 'XTerm' },
+    { pattern: /^kitty/i, shell: 'bash', name: 'Kitty' },
+    { pattern: /^alacritty/i, shell: 'bash', name: 'Alacritty' },
+  ];
+
+  const allCommands = [...windowsCommands, ...unixCommands];
+
+  for (const cmd of allCommands) {
+    if (cmd.pattern.test(trimmed)) {
+      return {
+        shouldIntercept: true,
+        shell: cmd.shell,
+        name: cmd.name,
+        originalCommand: data
+      };
+    }
+  }
+
+  return { shouldIntercept: false };
+}
+
 // IPC 通信处理 - 写入终端数据
 ipcMain.on('terminal:write', (event, payload) => {
   // 輸入驗證
@@ -160,6 +198,32 @@ ipcMain.on('terminal:write', (event, payload) => {
     return;
   }
 
+  // 檢測是否為開啟新終端的指令
+  const detection = detectNewTerminalCommand(data);
+
+  if (detection.shouldIntercept) {
+    console.log(`攔截到開啟新終端指令: ${detection.name}`);
+
+    // 發送消息給渲染進程，在應用內創建新標籤
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('terminal:request-new-tab', {
+        shell: detection.shell,
+        fromCommand: true,
+        commandName: detection.name
+      });
+    }
+
+    // 向當前終端輸出提示訊息
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const message = `\r\n\x1b[32m✓ 已在應用內開啟新的 ${detection.name} 標籤\x1b[0m\r\n`;
+      mainWindow.webContents.send('terminal:data', { id, data: message });
+    }
+
+    // 不將指令傳遞給 shell，阻止系統終端開啟
+    return;
+  }
+
+  // 正常指令，傳遞給終端
   ptyService.write(id, data);
 });
 

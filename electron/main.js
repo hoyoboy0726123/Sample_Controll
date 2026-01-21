@@ -141,25 +141,34 @@ ipcMain.handle('terminal:create', async (event, options) => {
 });
 
 // 檢測並攔截開啟新終端的指令
+// 注意：只攔截會開啟新視窗的指令，不攔截在當前終端啟動子 shell 的指令
 function detectNewTerminalCommand(data) {
-  const trimmed = data.trim().toLowerCase();
+  const trimmed = data.trim();
 
-  // Windows 指令
+  // Windows 指令 - 只攔截會開啟新視窗的指令
   const windowsCommands = [
-    { pattern: /^start\s+(cmd|powershell|pwsh)/i, shell: 'cmd.exe', name: 'CMD' },
-    { pattern: /^start\s+powershell/i, shell: 'powershell.exe', name: 'PowerShell' },
+    // start 指令會開啟新視窗
+    { pattern: /^start\s+cmd\b/i, shell: 'cmd.exe', name: 'CMD' },
+    { pattern: /^start\s+powershell\b/i, shell: 'powershell.exe', name: 'PowerShell' },
+    { pattern: /^start\s+pwsh\b/i, shell: 'powershell.exe', name: 'PowerShell Core' },
+
+    // wt (Windows Terminal) 會開啟新視窗或新標籤
     { pattern: /^wt\b/i, shell: 'auto', name: 'Windows Terminal' },
-    { pattern: /^cmd\s*$/i, shell: 'cmd.exe', name: 'CMD' },
-    { pattern: /^powershell\s*$/i, shell: 'powershell.exe', name: 'PowerShell' },
+    { pattern: /^wt\.exe\b/i, shell: 'auto', name: 'Windows Terminal' },
+
+    // 明確的新視窗指令
+    { pattern: /^start\s+\".*?\"\s+cmd\b/i, shell: 'cmd.exe', name: 'CMD' },
+    { pattern: /^start\s+\".*?\"\s+powershell\b/i, shell: 'powershell.exe', name: 'PowerShell' },
   ];
 
-  // Linux/Mac 指令
+  // Linux/Mac 指令 - 這些通常都會開啟新視窗
   const unixCommands = [
-    { pattern: /^gnome-terminal/i, shell: 'bash', name: 'GNOME Terminal' },
-    { pattern: /^konsole/i, shell: 'bash', name: 'Konsole' },
-    { pattern: /^xterm/i, shell: 'bash', name: 'XTerm' },
-    { pattern: /^kitty/i, shell: 'bash', name: 'Kitty' },
-    { pattern: /^alacritty/i, shell: 'bash', name: 'Alacritty' },
+    { pattern: /^gnome-terminal\b/i, shell: 'bash', name: 'GNOME Terminal' },
+    { pattern: /^konsole\b/i, shell: 'bash', name: 'Konsole' },
+    { pattern: /^xterm\b/i, shell: 'bash', name: 'XTerm' },
+    { pattern: /^kitty\b/i, shell: 'bash', name: 'Kitty' },
+    { pattern: /^alacritty\b/i, shell: 'bash', name: 'Alacritty' },
+    { pattern: /^x-terminal-emulator\b/i, shell: 'bash', name: 'Terminal' },
   ];
 
   const allCommands = [...windowsCommands, ...unixCommands];
@@ -177,6 +186,12 @@ function detectNewTerminalCommand(data) {
 
   return { shouldIntercept: false };
 }
+
+// 注意：以下指令不會被攔截，保持標準 OS 行為
+// - cmd (在當前終端啟動 CMD 子 shell)
+// - powershell (在當前終端啟動 PowerShell 子 shell)
+// - bash (在當前終端啟動 Bash 子 shell)
+// - 其他不會開啟新視窗的指令
 
 // IPC 通信处理 - 写入终端数据
 ipcMain.on('terminal:write', (event, payload) => {

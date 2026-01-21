@@ -183,23 +183,8 @@ ipcMain.handle('terminal:create', async (event, options) => {
   }
 });
 
-// 檢測並攔截開啟新終端的指令
-// 注意：只攔截會開啟新視窗的指令，不攔截在當前終端啟動子 shell 的指令
-function detectNewTerminalCommand(data) {
-  // 🔒 安全性：防止 ReDoS 攻擊，限制輸入長度
-  if (typeof data !== 'string') {
-    return { shouldIntercept: false };
-  }
-
-  // 超過 5000 字符的命令不進行匹配（防止 ReDoS）
-  if (data.length > 5000) {
-    console.warn('命令過長，跳過檢測（防止 ReDoS）');
-    return { shouldIntercept: false };
-  }
-
-  const trimmed = data.trim();
-
-  // Windows 指令 - 解析並提取參數
+// 檢測 Windows 終端命令
+function detectWindowsCommands(trimmed, originalData) {
   // start cmd /k <command> - 執行命令後保持視窗開啟
   const startCmdMatch = trimmed.match(/^start\s+cmd\s+\/k\s+(.+)/i);
   if (startCmdMatch) {
@@ -208,11 +193,11 @@ function detectNewTerminalCommand(data) {
       shell: 'cmd.exe',
       name: 'CMD',
       command: startCmdMatch[1],
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
-  // start cmd /c <command> - 執行命令後關閉視窗（通常不需要新視窗，但也處理）
+  // start cmd /c <command> - 執行命令後關閉視窗
   const startCmdCMatch = trimmed.match(/^start\s+cmd\s+\/c\s+(.+)/i);
   if (startCmdCMatch) {
     return {
@@ -220,7 +205,7 @@ function detectNewTerminalCommand(data) {
       shell: 'cmd.exe',
       name: 'CMD',
       command: startCmdCMatch[1],
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
@@ -230,7 +215,7 @@ function detectNewTerminalCommand(data) {
       shouldIntercept: true,
       shell: 'cmd.exe',
       name: 'CMD',
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
@@ -242,7 +227,7 @@ function detectNewTerminalCommand(data) {
       shell: 'powershell.exe',
       name: 'PowerShell',
       command: startPsMatch[1],
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
@@ -252,7 +237,7 @@ function detectNewTerminalCommand(data) {
       shouldIntercept: true,
       shell: 'powershell.exe',
       name: 'PowerShell',
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
@@ -262,7 +247,7 @@ function detectNewTerminalCommand(data) {
       shouldIntercept: true,
       shell: 'powershell.exe',
       name: 'PowerShell Core',
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
@@ -273,9 +258,9 @@ function detectNewTerminalCommand(data) {
       shouldIntercept: true,
       shell: 'auto',
       name: 'Windows Terminal',
-      cwd: wtDirMatch[1].replace(/['"]/g, ''), // 移除引號
+      cwd: wtDirMatch[1].replace(/['"]/g, ''),
       command: wtDirMatch[2],
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
@@ -287,7 +272,7 @@ function detectNewTerminalCommand(data) {
       shell: 'auto',
       name: 'Windows Terminal',
       command: wtMatch[1],
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
@@ -297,11 +282,15 @@ function detectNewTerminalCommand(data) {
       shouldIntercept: true,
       shell: 'auto',
       name: 'Windows Terminal',
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
-  // Linux/Mac 指令
+  return null;
+}
+
+// 檢測 Unix/Linux 終端命令
+function detectUnixCommands(trimmed, originalData) {
   // gnome-terminal -- <command>
   const gnomeMatch = trimmed.match(/^gnome-terminal\s+--\s+(.+)/i);
   if (gnomeMatch) {
@@ -310,7 +299,7 @@ function detectNewTerminalCommand(data) {
       shell: 'bash',
       name: 'GNOME Terminal',
       command: gnomeMatch[1],
-      originalCommand: data
+      originalCommand: originalData
     };
   }
 
@@ -330,11 +319,43 @@ function detectNewTerminalCommand(data) {
         shouldIntercept: true,
         shell: cmd.shell,
         name: cmd.name,
-        originalCommand: data
+        originalCommand: originalData
       };
     }
   }
 
+  return null;
+}
+
+// 檢測並攔截開啟新終端的指令（重構版）
+// 注意：只攔截會開啟新視窗的指令，不攔截在當前終端啟動子 shell 的指令
+function detectNewTerminalCommand(data) {
+  // 🔒 安全性：防止 ReDoS 攻擊，限制輸入長度
+  if (typeof data !== 'string') {
+    return { shouldIntercept: false };
+  }
+
+  // 超過 5000 字符的命令不進行匹配（防止 ReDoS）
+  if (data.length > 5000) {
+    console.warn('命令過長，跳過檢測（防止 ReDoS）');
+    return { shouldIntercept: false };
+  }
+
+  const trimmed = data.trim();
+
+  // 嘗試檢測 Windows 終端命令
+  const windowsResult = detectWindowsCommands(trimmed, data);
+  if (windowsResult) {
+    return windowsResult;
+  }
+
+  // 嘗試檢測 Unix/Linux 終端命令
+  const unixResult = detectUnixCommands(trimmed, data);
+  if (unixResult) {
+    return unixResult;
+  }
+
+  // 未檢測到需要攔截的命令
   return { shouldIntercept: false };
 }
 

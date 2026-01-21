@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Save, Trash2, AlertTriangle, CheckCircle } from 'lucide-react';
+import ConfirmDialog from './ConfirmDialog';
 
 export default function SettingsPanel({ isOpen, onClose, onSave }) {
   const [settings, setSettings] = useState({
@@ -9,6 +10,18 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
     theme: 'dark',
     restoreSession: true, // 預設啟用會話恢復
   });
+
+  // 確認對話框狀態
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    dataType: null,
+    isDangerous: false,
+  });
+
+  // 成功提示狀態
+  const [successMessage, setSuccessMessage] = useState(null);
 
   // 🔒 安全性：驗證設定數據
   const validateSettings = (settings) => {
@@ -71,43 +84,86 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
     }
   };
 
+  // 顯示成功提示（自動消失）
+  const showSuccess = (message) => {
+    setSuccessMessage(message);
+    setTimeout(() => setSuccessMessage(null), 3000);
+  };
+
+  // 打開確認對話框
   const handleClearData = (dataType) => {
     const confirmations = {
-      session: '確定要清除已保存的會話數據嗎？這將移除上次關閉時的所有終端機狀態。',
-      recentPaths: '確定要清除最近使用的路徑歷史記錄嗎？',
-      projectGroups: '確定要刪除所有項目群組嗎？',
-      all: '⚠️ 確定要清除所有數據嗎？\n\n這將刪除：\n• 已保存的會話\n• 最近路徑歷史\n• 所有項目群組\n\n（設定將會保留）'
+      session: {
+        title: '清除會話數據',
+        message: '確定要清除已保存的會話數據嗎？這將移除上次關閉時的所有終端機狀態。',
+        isDangerous: false,
+      },
+      recentPaths: {
+        title: '清除最近路徑',
+        message: '確定要清除最近使用的路徑歷史記錄嗎？',
+        isDangerous: false,
+      },
+      projectGroups: {
+        title: '清除項目群組',
+        message: '確定要刪除所有項目群組嗎？',
+        isDangerous: false,
+      },
+      all: {
+        title: '清除所有數據',
+        message: '確定要清除所有數據嗎？\n\n這將刪除：\n• 已保存的會話\n• 最近路徑歷史\n• 所有項目群組\n\n（設定將會保留）',
+        isDangerous: true,
+      },
     };
 
-    if (confirm(confirmations[dataType])) {
-      try {
-        switch (dataType) {
-          case 'session':
-            localStorage.removeItem('lastSession');
-            alert('會話數據已清除');
-            break;
-          case 'recentPaths':
-            localStorage.removeItem('recentPaths');
-            alert('最近路徑已清除');
-            break;
-          case 'projectGroups':
-            localStorage.removeItem('projectGroups');
-            alert('項目群組已清除');
-            break;
-          case 'all':
-            const savedSettings = localStorage.getItem('terminalSettings');
-            localStorage.clear();
-            if (savedSettings) {
-              localStorage.setItem('terminalSettings', savedSettings);
-            }
-            alert('所有數據已清除（設定已保留）');
-            break;
-        }
-      } catch (error) {
-        console.error('清除數據時發生錯誤:', error);
-        alert('清除數據失敗，請查看控制台了解詳情');
+    const config = confirmations[dataType];
+    setConfirmDialog({
+      isOpen: true,
+      title: config.title,
+      message: config.message,
+      dataType,
+      isDangerous: config.isDangerous,
+    });
+  };
+
+  // 確認清除數據
+  const handleConfirmClear = () => {
+    const { dataType } = confirmDialog;
+
+    try {
+      switch (dataType) {
+        case 'session':
+          localStorage.removeItem('lastSession');
+          showSuccess('會話數據已清除');
+          break;
+        case 'recentPaths':
+          localStorage.removeItem('recentPaths');
+          showSuccess('最近路徑已清除');
+          break;
+        case 'projectGroups':
+          localStorage.removeItem('projectGroups');
+          showSuccess('項目群組已清除');
+          break;
+        case 'all':
+          const savedSettings = localStorage.getItem('terminalSettings');
+          localStorage.clear();
+          if (savedSettings) {
+            localStorage.setItem('terminalSettings', savedSettings);
+          }
+          showSuccess('所有數據已清除（設定已保留）');
+          break;
       }
+    } catch (error) {
+      console.error('清除數據時發生錯誤:', error);
+      showSuccess('清除數據失敗，請查看控制台了解詳情');
     }
+
+    // 關閉對話框
+    setConfirmDialog({ isOpen: false, title: '', message: '', dataType: null, isDangerous: false });
+  };
+
+  // 取消清除
+  const handleCancelClear = () => {
+    setConfirmDialog({ isOpen: false, title: '', message: '', dataType: null, isDangerous: false });
   };
 
   if (!isOpen) return null;
@@ -386,6 +442,24 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
           </button>
         </div>
       </div>
+
+      {/* 確認對話框 */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        isDangerous={confirmDialog.isDangerous}
+        onConfirm={handleConfirmClear}
+        onCancel={handleCancelClear}
+      />
+
+      {/* 成功提示（Toast） */}
+      {successMessage && (
+        <div className="fixed bottom-4 right-4 bg-green-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 z-[10000] animate-fade-in">
+          <CheckCircle size={20} />
+          <span>{successMessage}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -279,27 +279,45 @@ function App() {
     setTheme((prev) => prev === 'dark' ? 'light' : 'dark');
   }, []);
 
+  // 🔒 性能優化：使用 useRef 保存回調函數，減少事件監聽器重新註冊
+  const handlersRef = useRef({
+    handleNewTabClick,
+    closeTab,
+    toggleSplitMode,
+    selectTab,
+  });
+
+  // 保持 ref 同步
+  useEffect(() => {
+    handlersRef.current = {
+      handleNewTabClick,
+      closeTab,
+      toggleSplitMode,
+      selectTab,
+    };
+  }, [handleNewTabClick, closeTab, toggleSplitMode, selectTab]);
+
   // 键盘快捷键
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Ctrl+T: 新建终端
       if (e.ctrlKey && e.key === 't') {
         e.preventDefault();
-        handleNewTabClick();
+        handlersRef.current.handleNewTabClick();
       }
 
       // Ctrl+W: 关闭当前终端
       if (e.ctrlKey && e.key === 'w') {
         e.preventDefault();
         if (activeTabId) {
-          closeTab(activeTabId);
+          handlersRef.current.closeTab(activeTabId);
         }
       }
 
       // Ctrl+\: 切换分屏
       if (e.ctrlKey && e.key === '\\') {
         e.preventDefault();
-        toggleSplitMode();
+        handlersRef.current.toggleSplitMode();
       }
 
       // Ctrl+数字键: 切换到对应标签
@@ -307,14 +325,14 @@ function App() {
         e.preventDefault();
         const index = parseInt(e.key) - 1;
         if (tabs[index]) {
-          selectTab(tabs[index].id);
+          handlersRef.current.selectTab(tabs[index].id);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, tabs, handleNewTabClick, closeTab, toggleSplitMode, selectTab]);
+  }, [activeTabId, tabs]); // 只依賴狀態，不依賴回調函數
 
   // 渲染终端
   const renderTerminals = () => {

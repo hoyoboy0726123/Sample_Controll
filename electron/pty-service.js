@@ -161,7 +161,12 @@ export function createPtyService() {
         }
 
         const shell = resolveShell(options.shell);
-        const cwd = options.cwd || process.env.HOME || process.env.USERPROFILE || os.homedir();
+
+        // 🔒 安全性：規範化並驗證工作目錄路徑
+        let cwd = options.cwd || process.env.HOME || process.env.USERPROFILE || os.homedir();
+
+        // 規範化路徑（解析相對路徑、移除 .. 等）
+        cwd = path.resolve(cwd);
 
         // 驗證工作目錄是否存在且可訪問
         if (cwd) {
@@ -174,6 +179,17 @@ export function createPtyService() {
             console.error(`Invalid working directory: ${cwd}`, error.message);
             throw new Error(`Cannot access working directory: ${cwd}`);
           }
+        }
+
+        // 🔒 安全性：可選的路徑範圍檢查（防止路徑遍歷）
+        // 註：此檢查可能過於嚴格，根據需求調整
+        const userHome = os.homedir();
+        const isInUserHome = cwd.startsWith(userHome);
+        const isInSystemPaths = cwd.startsWith('/home') || cwd.startsWith('/Users') || /^[A-Z]:\\/i.test(cwd);
+
+        if (!isInUserHome && !isInSystemPaths && cwd !== '/' && !cwd.startsWith('/tmp')) {
+          console.warn(`⚠️ Suspicious working directory (outside typical user paths): ${cwd}`);
+          // 不阻止，只記錄警告（可根據需求改為拒絕）
         }
 
         console.log(`Creating terminal ${id}:`);

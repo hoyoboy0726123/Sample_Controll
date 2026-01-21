@@ -55,10 +55,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('terminal:exit', handler);
   },
 
-  // 移除所有监听器（保留向後兼容）
-  removeAllListeners: (channel) => {
-    ipcRenderer.removeAllListeners(channel);
-  },
+  // 🔒 安全性：移除 removeAllListeners API
+  // 原因：渲染進程可以移除所有監聽器，包括其他組件註冊的，可能導致意外副作用
+  // 替代方案：每個監聽器 API 都返回清理函數，使用該函數清理
 
   // 监听應用內新建標籤請求（從指令觸發）
   onRequestNewTab: (callback) => {

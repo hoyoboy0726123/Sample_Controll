@@ -143,7 +143,9 @@ export function useTerminal(terminalId, shell, cwd) {
       // 初始化时延迟调用 fit()，确保 xterm 内部状态完全初始化
       initTimer = setTimeout(() => {
         isInitialized = true;
-        handleResize();
+        if (resizeHandler) {
+          resizeHandler();
+        }
       }, 100);
     };
 

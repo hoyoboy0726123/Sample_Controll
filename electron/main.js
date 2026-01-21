@@ -67,10 +67,37 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+  // 🔒 設置 Content Security Policy (CSP)
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          // 只允許來自同源和 localhost 的資源
+          "default-src 'self'; " +
+          // 允許內聯樣式（Tailwind CSS 需要），但不允許 eval
+          "style-src 'self' 'unsafe-inline'; " +
+          // 只允許來自自身的腳本
+          "script-src 'self'; " +
+          // 允許圖片來自 self 和 data URIs
+          "img-src 'self' data:; " +
+          // 允許連接到 localhost（Vite HMR）和 self
+          "connect-src 'self' ws://localhost:* http://localhost:*; " +
+          // 允許字體來自 self 和 data URIs
+          "font-src 'self' data:;"
+        ]
+      }
+    });
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 }
+
+// 🔒 保存事件監聽器清理函數
+let cleanupDataCallback = null;
+let cleanupExitCallback = null;
 
 // 应用准备就绪时创建窗口
 app.whenReady().then(() => {
@@ -87,6 +114,22 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+// 🔒 應用退出前清理事件監聽器
+app.on('before-quit', () => {
+  console.log('清理事件監聽器...');
+
+  // 清理 PTY 服務的事件監聽器
+  if (cleanupDataCallback) {
+    cleanupDataCallback();
+    cleanupDataCallback = null;
+  }
+
+  if (cleanupExitCallback) {
+    cleanupExitCallback();
+    cleanupExitCallback = null;
   }
 });
 
@@ -143,6 +186,17 @@ ipcMain.handle('terminal:create', async (event, options) => {
 // 檢測並攔截開啟新終端的指令
 // 注意：只攔截會開啟新視窗的指令，不攔截在當前終端啟動子 shell 的指令
 function detectNewTerminalCommand(data) {
+  // 🔒 安全性：防止 ReDoS 攻擊，限制輸入長度
+  if (typeof data !== 'string') {
+    return { shouldIntercept: false };
+  }
+
+  // 超過 5000 字符的命令不進行匹配（防止 ReDoS）
+  if (data.length > 5000) {
+    console.warn('命令過長，跳過檢測（防止 ReDoS）');
+    return { shouldIntercept: false };
+  }
+
   const trimmed = data.trim();
 
   // Windows 指令 - 解析並提取參數
@@ -398,18 +452,14 @@ ipcMain.on('terminal:close', (event, payload) => {
 });
 
 // 将 PTY 输出发送到渲染进程
-// 注意: onData 和 onExit 返回清理函數，但在此應用中回調應存在於整個應用生命週期
-// 如果需要清理，可以保存返回的函數並在適當時候調用:
-// const cleanupData = ptyService.onData(...);
-// const cleanupExit = ptyService.onExit(...);
-// 然後在需要時調用: cleanupData(); cleanupExit();
-ptyService.onData((id, data) => {
+// 🔒 保存清理函數以便應用退出時清理
+cleanupDataCallback = ptyService.onData((id, data) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('terminal:data', { id, data });
   }
 });
 
-ptyService.onExit((id, code) => {
+cleanupExitCallback = ptyService.onExit((id, code) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('terminal:exit', { id, code });
   }

@@ -101,6 +101,34 @@ export function useTerminal(terminalId, shell, cwd, command) {
             // 延遲執行命令，確保終端完全初始化
             setTimeout(() => {
               if (window.electronAPI) {
+                // 安全性驗證：檢查命令
+                if (typeof command !== 'string') {
+                  console.error('命令必須是字符串類型');
+                  return;
+                }
+
+                // 長度限制：防止過長命令
+                if (command.length > 10000) {
+                  console.error('命令過長，已拒絕執行（最大 10000 字符）');
+                  return;
+                }
+
+                // 危險命令檢測：警告潛在危險命令
+                const dangerousPatterns = [
+                  /rm\s+-rf\s+\/\s*$/i,           // rm -rf /
+                  /format\s+[A-Z]:\s*$/i,         // format C:
+                  /del\s+\/[SF]/i,                // del /S /F
+                  /mkfs\./i,                      // mkfs.ext4 等
+                  />>\s*\/dev\/sd[a-z]/i,         // 直接寫入磁碟設備
+                ];
+
+                const isDangerous = dangerousPatterns.some(pattern => pattern.test(command));
+                if (isDangerous) {
+                  console.warn(`⚠️ 檢測到潛在危險命令: ${command}`);
+                  console.warn('此命令可能導致數據損失，已記錄但仍會執行');
+                  // 不阻止執行，因為可能是合法用途，但記錄警告
+                }
+
                 console.log(`在終端 ${terminalId} 中執行命令: ${command}`);
                 // 發送命令加上 Enter 鍵
                 window.electronAPI.writeToTerminal(terminalId, command + '\r');
@@ -224,24 +252,25 @@ export function useTerminal(terminalId, shell, cwd, command) {
     // 開始檢查和初始化
     checkAndInitialize();
 
-    // 清理
+    // 清理（重構：按順序清理，避免重複代碼）
     return () => {
-      // 清理計時器
+      // 1. 清理計時器
       if (initTimer) {
         clearTimeout(initTimer);
       }
 
-      // 清理 window resize 監聽器（使用保存的引用）
+      // 2. 清理 window resize 監聽器
       if (resizeHandler) {
         window.removeEventListener('resize', resizeHandler);
       }
 
-      // 清理 ResizeObserver
+      // 3. 清理 ResizeObserver（只保留一次）
       if (resizeObserver) {
         resizeObserver.disconnect();
+        resizeObserver = null;
       }
 
-      // 清理 IPC 監聽器
+      // 4. 清理 IPC 監聽器
       if (cleanupTerminalData) {
         cleanupTerminalData();
       }
@@ -249,13 +278,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
         cleanupTerminalExit();
       }
 
-      // 先清理事件監聽器和觀察者
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-        resizeObserver = null;
-      }
-
-      // 清理 xterm 實例
+      // 5. 清理 xterm 實例
       if (xtermRef.current) {
         try {
           xtermRef.current.dispose();
@@ -265,23 +288,27 @@ export function useTerminal(terminalId, shell, cwd, command) {
         xtermRef.current = null;
       }
 
-      // 延遲關閉終端，給予足夠時間清理
-      // 這可以減少 AttachConsole 錯誤
+      // 6. 延遲關閉終端（減少 AttachConsole 錯誤）
       if (window.electronAPI) {
         setTimeout(() => {
           try {
             window.electronAPI.closeTerminal(terminalId);
           } catch (err) {
-            // 忽略關閉時的錯誤，這通常是 node-pty 的內部問題
             console.warn('關閉終端時發生錯誤（可忽略）:', err);
           }
         }, 100);
       }
 
-      // 重置初始化標誌
+      // 7. 重置初始化標誌
       isInitializingRef.current = false;
     };
   }, [terminalId, shell, cwd]);
+
+  // 🔒 修復內存洩漏：當 command 變化時重置執行標誌
+  useEffect(() => {
+    // 重置命令執行標誌，允許新命令執行
+    commandExecutedRef.current = false;
+  }, [command]);
 
   const focus = () => {
     if (xtermRef.current) {

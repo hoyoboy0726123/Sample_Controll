@@ -6,10 +6,35 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createTerminal: (options) => ipcRenderer.invoke('terminal:create', options),
 
   // 写入数据到终端
-  writeToTerminal: (id, data) => ipcRenderer.send('terminal:write', { id, data }),
+  writeToTerminal: (id, data) => {
+    // 🔒 客戶端驗證：防止發送過大數據
+    if (typeof id !== 'string' || id.length === 0 || id.length > 255) {
+      throw new Error('Invalid terminal id');
+    }
+    if (typeof data !== 'string') {
+      throw new Error('Data must be a string');
+    }
+    if (data.length > 50000) {  // 降低到 50KB
+      console.warn('數據過大，已截斷（最大 50KB）');
+      data = data.substring(0, 50000);
+    }
+    return ipcRenderer.send('terminal:write', { id, data });
+  },
 
   // 调整终端大小
-  resizeTerminal: (id, cols, rows) => ipcRenderer.send('terminal:resize', { id, cols, rows }),
+  resizeTerminal: (id, cols, rows) => {
+    // 🔒 客戶端驗證：防止無效的終端大小
+    if (typeof id !== 'string' || id.length === 0 || id.length > 255) {
+      throw new Error('Invalid terminal id');
+    }
+    if (!Number.isInteger(cols) || cols < 1 || cols > 1000) {
+      throw new Error('Invalid cols value (must be 1-1000)');
+    }
+    if (!Number.isInteger(rows) || rows < 1 || rows > 1000) {
+      throw new Error('Invalid rows value (must be 1-1000)');
+    }
+    return ipcRenderer.send('terminal:resize', { id, cols, rows });
+  },
 
   // 关闭终端
   closeTerminal: (id) => ipcRenderer.send('terminal:close', { id }),

@@ -26,6 +26,72 @@ function App() {
     restoreSession: false, // 默認關閉會話恢復，避免問題
   });
 
+  // 🔒 安全性：驗證 tab 數據結構
+  const validateTabData = useCallback((tab) => {
+    if (!tab || typeof tab !== 'object') return false;
+
+    // 驗證必需欄位
+    if (typeof tab.id !== 'string' || tab.id.length === 0 || tab.id.length > 256) {
+      return false;
+    }
+
+    // 驗證可選欄位
+    if (tab.shell !== undefined && typeof tab.shell !== 'string') {
+      return false;
+    }
+    if (tab.cwd !== undefined && (typeof tab.cwd !== 'string' || tab.cwd.length > 1000)) {
+      return false;
+    }
+    if (tab.title !== undefined && (typeof tab.title !== 'string' || tab.title.length > 256)) {
+      return false;
+    }
+
+    // 🔒 安全性：不恢復命令（避免自動執行惡意命令）
+    // tab.command 會被忽略，不會在會話恢復時執行
+
+    return true;
+  }, []);
+
+  // 🔒 安全性：清理和驗證會話數據
+  const sanitizeSession = useCallback((session) => {
+    if (!session || typeof session !== 'object') {
+      return null;
+    }
+
+    // 驗證並清理 tabs
+    const tabs = Array.isArray(session.tabs)
+      ? session.tabs
+          .filter(validateTabData)
+          .map(tab => ({
+            id: tab.id,
+            title: tab.title || 'Terminal',
+            shell: tab.shell,
+            cwd: tab.cwd,
+            // 🔒 安全性：不恢復 command，防止自動執行惡意命令
+            command: undefined,
+          }))
+      : [];
+
+    // 驗證 activeTabId
+    const activeTabId = typeof session.activeTabId === 'string'
+      && tabs.some(t => t.id === session.activeTabId)
+      ? session.activeTabId
+      : null;
+
+    // 驗證 terminalIdCounter
+    const terminalIdCounter = Number.isInteger(session.terminalIdCounter)
+      && session.terminalIdCounter >= 0
+      && session.terminalIdCounter < 10000
+      ? session.terminalIdCounter
+      : 0;
+
+    return {
+      tabs,
+      activeTabId,
+      terminalIdCounter,
+    };
+  }, [validateTabData]);
+
   // 创建新标签页
   const createNewTab = useCallback((options = {}) => {
     const id = `terminal-${terminalIdCounterRef.current++}`;
@@ -41,20 +107,9 @@ function App() {
       command: options.command, // 要在新終端執行的命令
     };
 
-    // 使用函數式更新，不需要依賴 tabs
-    setTabs((prev) => {
-      // 如果當前有標籤且指定了 cwd，添加延遲避免資源衝突
-      if (prev.length > 0 && options.cwd) {
-        setTimeout(() => {
-          setTabs(current => [...current, newTab]);
-          setActiveTabId(id);
-        }, 150);
-        return prev; // 返回當前狀態，延遲更新在 setTimeout 中
-      }
-      // 否則立即更新
-      setActiveTabId(id);
-      return [...prev, newTab];
-    });
+    // 直接同步更新狀態（移除 setTimeout 避免競態條件）
+    setTabs((prev) => [...prev, newTab]);
+    setActiveTabId(id);
   }, [settings.defaultShell]);
 
   // 載入設定並恢復會話
@@ -91,18 +146,23 @@ function App() {
 
       if (savedSession) {
         try {
-          const session = JSON.parse(savedSession);
+          const rawSession = JSON.parse(savedSession);
 
-          // 恢復終端機計數器
-          if (session.terminalIdCounter) {
+          // 🔒 安全性：使用 sanitizeSession 驗證和清理數據
+          const session = sanitizeSession(rawSession);
+
+          if (session && session.tabs.length > 0) {
+            // 恢復終端機計數器
             terminalIdCounterRef.current = session.terminalIdCounter;
-          }
 
-          // 恢復所有終端機標籤
-          if (session.tabs && session.tabs.length > 0) {
+            // 恢復所有終端機標籤
             setTabs(session.tabs);
             setActiveTabId(session.activeTabId || session.tabs[0].id);
+
+            console.log(`✅ 已恢復 ${session.tabs.length} 個終端機標籤（已驗證安全性）`);
             return; // 成功恢復會話，不需要創建新終端機
+          } else {
+            console.warn('會話數據無效或為空，創建新終端機');
           }
         } catch (error) {
           console.error('恢復會話失敗:', error);

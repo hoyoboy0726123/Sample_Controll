@@ -25,6 +25,47 @@ export function createPtyService() {
     }
   };
 
+  // Shell 白名單（安全性：只允許常見的可信 shell）
+  const ALLOWED_SHELLS_WINDOWS = [
+    'C:\\Windows\\System32\\cmd.exe',
+    'C:\\Windows\\SysWOW64\\cmd.exe',
+    'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    'C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe',
+    'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+    'C:\\Program Files\\Git\\bin\\bash.exe',
+    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
+    'powershell.exe',
+    'pwsh.exe',
+    'cmd.exe',
+    'bash.exe',
+  ];
+
+  const ALLOWED_SHELLS_UNIX = [
+    '/bin/bash',
+    '/bin/sh',
+    '/bin/zsh',
+    '/bin/dash',
+    '/usr/bin/bash',
+    '/usr/bin/zsh',
+    '/usr/bin/fish',
+    '/bin/fish',
+  ];
+
+  // 驗證 shell 路徑是否在白名單中
+  const isShellAllowed = (shellPath) => {
+    const platform = os.platform();
+    const allowedShells = platform === 'win32' ? ALLOWED_SHELLS_WINDOWS : ALLOWED_SHELLS_UNIX;
+
+    // 規範化路徑用於比較
+    const normalizedPath = path.resolve(shellPath).toLowerCase();
+
+    // 檢查是否在白名單中
+    return allowedShells.some(allowedShell => {
+      const normalizedAllowed = path.resolve(allowedShell).toLowerCase();
+      return normalizedPath === normalizedAllowed || shellPath.toLowerCase() === allowedShell.toLowerCase();
+    });
+  };
+
   // 解析 shell 路徑
   const resolveShell = (shellOption) => {
     const platform = os.platform();
@@ -70,8 +111,19 @@ export function createPtyService() {
           return 'bash.exe';
         }
         default:
-          // 如果是完整路徑，直接返回
-          return shellOption;
+          // 如果是完整路徑，驗證是否在白名單中
+          if (fileExists(shellOption)) {
+            if (isShellAllowed(shellOption)) {
+              return shellOption;
+            } else {
+              console.warn(`⚠️ Shell 路徑不在白名單中，已拒絕: ${shellOption}`);
+              console.warn('使用默認 shell 代替');
+              return getDefaultShell();
+            }
+          }
+          // 路徑不存在，使用默認 shell
+          console.warn(`Shell 不存在: ${shellOption}，使用默認 shell`);
+          return getDefaultShell();
       }
     }
 
@@ -84,7 +136,19 @@ export function createPtyService() {
       case 'fish':
         return '/usr/bin/fish';
       default:
-        return shellOption;
+        // 如果是完整路徑，驗證是否在白名單中
+        if (fileExists(shellOption)) {
+          if (isShellAllowed(shellOption)) {
+            return shellOption;
+          } else {
+            console.warn(`⚠️ Shell 路徑不在白名單中，已拒絕: ${shellOption}`);
+            console.warn('使用默認 shell 代替');
+            return getDefaultShell();
+          }
+        }
+        // 路徑不存在，使用默認 shell
+        console.warn(`Shell 不存在: ${shellOption}，使用默認 shell`);
+        return getDefaultShell();
     }
   };
 

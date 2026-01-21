@@ -10,12 +10,48 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
     restoreSession: true, // 預設啟用會話恢復
   });
 
+  // 🔒 安全性：驗證設定數據
+  const validateSettings = (settings) => {
+    const defaults = {
+      defaultShell: 'auto',
+      fontSize: 14,
+      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+      theme: 'dark',
+      restoreSession: true,
+    };
+
+    if (!settings || typeof settings !== 'object') {
+      return defaults;
+    }
+
+    return {
+      defaultShell: typeof settings.defaultShell === 'string' && settings.defaultShell.length < 256
+        ? settings.defaultShell
+        : defaults.defaultShell,
+      fontSize: Number.isInteger(settings.fontSize) && settings.fontSize >= 10 && settings.fontSize <= 30
+        ? settings.fontSize
+        : defaults.fontSize,
+      fontFamily: typeof settings.fontFamily === 'string' && settings.fontFamily.length < 500
+        ? settings.fontFamily
+        : defaults.fontFamily,
+      theme: ['dark', 'light'].includes(settings.theme)
+        ? settings.theme
+        : defaults.theme,
+      restoreSession: typeof settings.restoreSession === 'boolean'
+        ? settings.restoreSession
+        : defaults.restoreSession,
+    };
+  };
+
   useEffect(() => {
     // 從 localStorage 載入設定
     try {
       const savedSettings = localStorage.getItem('terminalSettings');
       if (savedSettings) {
-        setSettings(JSON.parse(savedSettings));
+        const parsed = JSON.parse(savedSettings);
+        // 🔒 驗證設定數據
+        const validated = validateSettings(parsed);
+        setSettings(validated);
       }
     } catch (error) {
       console.error('無法從 localStorage 載入設定:', error);

@@ -207,26 +207,69 @@ export default function SettingsPanel({ isOpen, onClose, onSave }) {
           {/* 快速鍵說明 */}
           <div>
             <h3 className="text-lg font-medium text-white mb-3">快速鍵</h3>
-            <div className="bg-[#1e1e1e] rounded p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">新建終端機</span>
-                <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + T</kbd>
+
+            <div className="space-y-3">
+              {/* 應用程式快捷鍵 */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-400 mb-2">應用程式</h4>
+                <div className="bg-[#1e1e1e] rounded p-3 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">新建終端機</span>
+                    <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + T</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">關閉終端機</span>
+                    <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + W</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">切換分屏</span>
+                    <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + \</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">切換標籤</span>
+                    <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + 1-9</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">開發者工具</span>
+                    <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">F12</kbd>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">關閉終端機</span>
-                <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + W</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">切換分屏</span>
-                <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + \</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">切換標籤</span>
-                <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + 1-9</kbd>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">開發者工具</span>
-                <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">F12</kbd>
+
+              {/* 終端機內快捷鍵 */}
+              <div>
+                <h4 className="text-sm font-medium text-gray-400 mb-2">終端機內操作</h4>
+                <div className="bg-[#1e1e1e] rounded p-3 space-y-2 text-sm">
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="text-gray-400">複製</div>
+                      <div className="text-xs text-gray-600 mt-0.5">選中文字後使用</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + C</kbd>
+                      <span className="text-gray-600">或</span>
+                      <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300 text-xs">Ctrl + Shift + C</kbd>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="text-gray-400">貼上</div>
+                      <div className="text-xs text-gray-600 mt-0.5">貼上剪貼板內容</div>
+                    </div>
+                    <div className="flex gap-2">
+                      <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + V</kbd>
+                      <span className="text-gray-600">或</span>
+                      <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300 text-xs">Ctrl + Shift + V</kbd>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1">
+                      <div className="text-gray-400">中斷進程</div>
+                      <div className="text-xs text-gray-600 mt-0.5">無選中文字時</div>
+                    </div>
+                    <kbd className="px-2 py-1 bg-[#3c3c3c] rounded text-gray-300">Ctrl + C</kbd>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

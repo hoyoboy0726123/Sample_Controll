@@ -112,6 +112,63 @@ export function useTerminal(terminalId, shell, cwd) {
         xterm.onData((data) => {
           window.electronAPI.writeToTerminal(terminalId, data);
         });
+
+        // 添加複製貼上功能
+        xterm.attachCustomKeyEventHandler((event) => {
+          // Ctrl+C: 如果有選中文字則複製，否則發送中斷信號
+          if (event.ctrlKey && event.key === 'c' && event.type === 'keydown') {
+            const selection = xterm.getSelection();
+            if (selection) {
+              // 有選中文字，複製到剪貼板
+              navigator.clipboard.writeText(selection).catch(err => {
+                console.error('複製失敗:', err);
+              });
+              return false; // 阻止默認行為
+            }
+            // 沒有選中文字，讓 Ctrl+C 正常發送中斷信號
+            return true;
+          }
+
+          // Ctrl+V: 貼上剪貼板內容
+          if (event.ctrlKey && event.key === 'v' && event.type === 'keydown') {
+            event.preventDefault();
+            navigator.clipboard.readText().then(text => {
+              if (text && window.electronAPI) {
+                window.electronAPI.writeToTerminal(terminalId, text);
+              }
+            }).catch(err => {
+              console.error('貼上失敗:', err);
+            });
+            return false; // 阻止默認行為
+          }
+
+          // Ctrl+Shift+C: 強制複製（備用方案）
+          if (event.ctrlKey && event.shiftKey && event.key === 'C' && event.type === 'keydown') {
+            const selection = xterm.getSelection();
+            if (selection) {
+              navigator.clipboard.writeText(selection).catch(err => {
+                console.error('複製失敗:', err);
+              });
+            }
+            return false;
+          }
+
+          // Ctrl+Shift+V: 強制貼上（備用方案）
+          if (event.ctrlKey && event.shiftKey && event.key === 'V' && event.type === 'keydown') {
+            event.preventDefault();
+            navigator.clipboard.readText().then(text => {
+              if (text && window.electronAPI) {
+                window.electronAPI.writeToTerminal(terminalId, text);
+              }
+            }).catch(err => {
+              console.error('貼上失敗:', err);
+            });
+            return false;
+          }
+
+          // 其他按鍵正常處理
+          return true;
+        });
       }
 
       // 窗口大小改变时自适应
@@ -177,15 +234,33 @@ export function useTerminal(terminalId, shell, cwd) {
         cleanupTerminalExit();
       }
 
+      // 先清理事件監聽器和觀察者
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+        resizeObserver = null;
+      }
+
       // 清理 xterm 實例
       if (xtermRef.current) {
-        xtermRef.current.dispose();
+        try {
+          xtermRef.current.dispose();
+        } catch (err) {
+          console.warn('清理 xterm 時發生錯誤:', err);
+        }
         xtermRef.current = null;
       }
 
-      // 關閉終端
+      // 延遲關閉終端，給予足夠時間清理
+      // 這可以減少 AttachConsole 錯誤
       if (window.electronAPI) {
-        window.electronAPI.closeTerminal(terminalId);
+        setTimeout(() => {
+          try {
+            window.electronAPI.closeTerminal(terminalId);
+          } catch (err) {
+            // 忽略關閉時的錯誤，這通常是 node-pty 的內部問題
+            console.warn('關閉終端時發生錯誤（可忽略）:', err);
+          }
+        }, 100);
       }
 
       // 重置初始化標誌

@@ -226,55 +226,53 @@ export function useTerminal(terminalId, shell, cwd, command) {
           window.electronAPI.writeToTerminal(terminalId, data);
         });
 
-        // 🎯 修復 Windows 高 DPI 環境下的 IME 候選框定位問題
-        // xterm.js 的 CompositionHelper 沒有考慮 devicePixelRatio
-        // 參考：https://github.com/xtermjs/xterm.js/blob/master/src/browser/input/CompositionHelper.ts
+        // 🎯 修復 IME 候選框定位 - 強制將 textarea 定位到游標位置
+        // Windows IME 候選框由操作系統根據 textarea 位置顯示
         const fixIMEPosition = () => {
           const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
-          const compositionView = terminalRef.current?.querySelector('.composition-view');
-
           if (!textareaElement || !xterm.buffer) return;
 
           try {
-            // 獲取 DPI 縮放比例
-            const dpr = window.devicePixelRatio || 1;
-
-            // 獲取終端容器的偏移量
-            const terminalRect = terminalRef.current.getBoundingClientRect();
-
             // 獲取游標位置
             const cursorX = xterm.buffer.active.cursorX;
             const cursorY = xterm.buffer.active.cursorY;
 
-            // 獲取字符尺寸（CSS 像素）
-            const cellWidth = xterm._core._renderService?.dimensions?.css?.cell?.width || 9;
-            const cellHeight = xterm._core._renderService?.dimensions?.css?.cell?.height || 17;
+            // 獲取字符尺寸（使用實際渲染尺寸）
+            const dimensions = xterm._core._renderService?.dimensions;
+            const cellWidth = dimensions?.css?.cell?.width || 9;
+            const cellHeight = dimensions?.css?.cell?.height || 17;
 
-            // 計算游標的實際像素位置（考慮 DPI）
+            // 計算游標像素位置
             const left = cursorX * cellWidth;
             const top = cursorY * cellHeight;
 
-            // 設置 textarea 位置（xterm.js 會自動處理，我們只需要確保它可見）
-            // 不強制覆蓋位置，而是讓 xterm.js 處理，但確保容器沒有變換
-            textareaElement.style.transform = 'none';
+            // 強制設置 textarea 位置和尺寸
+            textareaElement.style.position = 'absolute';
+            textareaElement.style.left = `${left}px`;
+            textareaElement.style.top = `${top}px`;
+            textareaElement.style.width = `${cellWidth}px`;
+            textareaElement.style.height = `${cellHeight}px`;
+            textareaElement.style.zIndex = '1';
+            textareaElement.style.opacity = '0';
 
-            // 如果有 composition view，確保它在正確位置
-            if (compositionView) {
-              compositionView.style.left = `${left}px`;
-              compositionView.style.top = `${top}px`;
-            }
-
-            console.log(`IME fix - cursor: (${cursorX}, ${cursorY}), pos: (${left}px, ${top}px), DPR: ${dpr}`);
+            console.log(`IME: cursor(${cursorX},${cursorY}) -> px(${left},${top}), cell(${cellWidth.toFixed(1)}x${cellHeight.toFixed(1)})`);
           } catch (err) {
-            console.warn('Failed to fix IME position:', err);
+            console.warn('IME fix error:', err);
           }
         };
 
-        // 監聽 composition 事件
+        // 在多個時機更新 textarea 位置
         const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
         if (textareaElement) {
+          // Composition 事件
           textareaElement.addEventListener('compositionstart', fixIMEPosition);
           textareaElement.addEventListener('compositionupdate', fixIMEPosition);
+
+          // 鍵盤事件 - 在任何按鍵時更新（確保游標移動後更新）
+          textareaElement.addEventListener('keydown', fixIMEPosition);
+
+          // Input 事件 - 在輸入時更新
+          textareaElement.addEventListener('input', fixIMEPosition);
         }
 
         // 添加複製貼上功能

@@ -238,8 +238,8 @@ export function useTerminal(terminalId, shell, cwd, command) {
         // 監聽 composition 事件以確保候選框位置正確
         const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
         if (textareaElement) {
-          // 當開始輸入中文時（composition start），立即更新 textarea 位置
-          textareaElement.addEventListener('compositionstart', () => {
+          // 創建統一的位置更新函數
+          const updateTextareaPosition = () => {
             if (!xtermRef.current || !terminalRef.current) return;
 
             try {
@@ -255,9 +255,21 @@ export function useTerminal(terminalId, shell, cwd, command) {
               textareaElement.style.left = `${cursorX * charWidth}px`;
               textareaElement.style.top = `${cursorY * charHeight}px`;
 
-              console.log(`IME composition start - cursor at (${cursorX}, ${cursorY}), textarea positioned at (${cursorX * charWidth}px, ${cursorY * charHeight}px)`);
+              console.log(`IME textarea positioned at cursor (${cursorX}, ${cursorY}) -> (${cursorX * charWidth}px, ${cursorY * charHeight}px)`);
             } catch (err) {
               console.warn('Failed to update textarea position for IME:', err);
+            }
+          };
+
+          // 監聽所有 composition 事件，持續更新位置
+          textareaElement.addEventListener('compositionstart', updateTextareaPosition);
+          textareaElement.addEventListener('compositionupdate', updateTextareaPosition);
+
+          // 也監聽 input 事件，確保在中文輸入過程中持續更新
+          textareaElement.addEventListener('input', (e) => {
+            // 只在 composition 進行時更新（避免干擾英文輸入）
+            if (e.isComposing) {
+              updateTextareaPosition();
             }
           });
         }

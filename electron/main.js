@@ -81,24 +81,35 @@ function createWindow() {
   }
 
   // 🔒 設置 Content Security Policy (CSP)
+  // 開發環境需要放寬限制以支援 Vite HMR
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+
+    const cspPolicy = isDev
+      ? [
+          // 開發環境：允許 Vite 所需的內聯腳本和 eval
+          "default-src 'self'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +  // Vite 需要
+          "img-src 'self' data: blob:; " +
+          "connect-src 'self' ws://localhost:* http://localhost:* ws://127.0.0.1:* http://127.0.0.1:*; " +
+          "font-src 'self' data:; " +
+          "worker-src 'self' blob:;"  // Web Workers
+        ]
+      : [
+          // 生產環境：嚴格的 CSP
+          "default-src 'self'; " +
+          "style-src 'self' 'unsafe-inline'; " +
+          "script-src 'self'; " +
+          "img-src 'self' data:; " +
+          "connect-src 'self'; " +
+          "font-src 'self' data:;"
+        ];
+
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [
-          // 只允許來自同源和 localhost 的資源
-          "default-src 'self'; " +
-          // 允許內聯樣式（Tailwind CSS 需要），但不允許 eval
-          "style-src 'self' 'unsafe-inline'; " +
-          // 只允許來自自身的腳本
-          "script-src 'self'; " +
-          // 允許圖片來自 self 和 data URIs
-          "img-src 'self' data:; " +
-          // 允許連接到 localhost（Vite HMR）和 self
-          "connect-src 'self' ws://localhost:* http://localhost:*; " +
-          // 允許字體來自 self 和 data URIs
-          "font-src 'self' data:;"
-        ]
+        'Content-Security-Policy': cspPolicy
       }
     });
   });

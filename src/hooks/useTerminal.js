@@ -226,67 +226,47 @@ export function useTerminal(terminalId, shell, cwd, command) {
           window.electronAPI.writeToTerminal(terminalId, data);
         });
 
-        // 🎯 修復 IME 候選框定位 - 將候選框顯示在游標位置的上方
-        // 根據 Electron Issue #4539: IME 位置錨定在 selection 或 activeElement
-        // 參考：https://github.com/electron/electron/issues/4539
+        // 🎯 修復 IME 候選框定位 - 固定在終端中間位置
+        // 將 textarea 固定在可見區域的中間，避免位置計算問題
         const fixIMEPosition = () => {
           const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
-          if (!textareaElement || !xterm.buffer) return;
+          const xtermScreen = terminalRef.current?.querySelector('.xterm-screen');
+          if (!textareaElement || !xtermScreen) return;
 
           try {
-            // 確保 textarea 有 focus
-            if (document.activeElement !== textareaElement) {
-              textareaElement.focus();
-            }
+            // 獲取終端可見區域的尺寸
+            const rect = xtermScreen.getBoundingClientRect();
 
-            // 獲取游標位置
-            const cursorX = xterm.buffer.active.cursorX;
-            const cursorY = xterm.buffer.active.cursorY;
+            // 將 textarea 放在終端可見區域的中間偏上位置
+            const left = rect.width / 2;
+            const top = rect.height / 3; // 上方三分之一處
 
-            // 獲取字符尺寸
-            const dimensions = xterm._core._renderService?.dimensions;
-            const cellWidth = dimensions?.css?.cell?.width || 9;
-            const cellHeight = dimensions?.css?.cell?.height || 17;
-
-            // 計算游標像素位置 - 使用實際的 X 座標，並將候選框放在上方一行
-            const left = cursorX * cellWidth;
-            // 將 textarea 放在游標上方一行，如果在第一行則保持在同一行
-            const top = Math.max(0, (cursorY - 1) * cellHeight);
-
-            // 設置 textarea 位置
+            // 設置 textarea 位置 - 固定在中間
             textareaElement.style.position = 'absolute';
             textareaElement.style.left = `${left}px`;
             textareaElement.style.top = `${top}px`;
-            textareaElement.style.width = `${cellWidth}px`;
-            textareaElement.style.height = `${cellHeight}px`;
+            textareaElement.style.width = '1px';
+            textareaElement.style.height = '1px';
             textareaElement.style.zIndex = '1';
             textareaElement.style.opacity = '0';
 
-            // 🔑 關鍵：設置 textarea 的 selection range
-            // 這會告訴瀏覽器/IME 當前輸入位置在哪裡
+            // 設置 selection range
             if (textareaElement.setSelectionRange) {
               const length = textareaElement.value.length;
               textareaElement.setSelectionRange(length, length);
             }
 
-            console.log(`IME: cursor(${cursorX},${cursorY}) -> px(left=${left.toFixed(1)}, top=${top.toFixed(1)})`);
+            console.log(`IME: Fixed position at center (left=${left.toFixed(1)}, top=${top.toFixed(1)})`);
           } catch (err) {
             console.warn('IME fix error:', err);
           }
         };
 
-        // 在多個時機更新 textarea 位置
+        // 只在 compositionstart 時更新位置，避免干擾輸入
         const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
         if (textareaElement) {
-          // Composition 事件
+          // 只在開始輸入時定位一次
           textareaElement.addEventListener('compositionstart', fixIMEPosition);
-          textareaElement.addEventListener('compositionupdate', fixIMEPosition);
-
-          // Focus 事件 - 當 textarea 獲得焦點時
-          textareaElement.addEventListener('focus', fixIMEPosition);
-
-          // Input 事件 - 在輸入時更新
-          textareaElement.addEventListener('input', fixIMEPosition);
         }
 
         // 添加複製貼上功能

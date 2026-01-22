@@ -78,6 +78,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
         scrollback: VALIDATION.SCROLLBACK_BUFFER,
         rows: 24,
         cols: 80,
+        windowsMode: true, // 啟用 Windows 模式以改善 IME 支援
       });
 
       // 添加插件
@@ -225,60 +226,6 @@ export function useTerminal(terminalId, shell, cwd, command) {
         xterm.onData((data) => {
           window.electronAPI.writeToTerminal(terminalId, data);
         });
-
-        // 🎯 修復 IME 候選框定位 - 跟隨游標位置
-        // 根據 xterm 的游標位置來定位 textarea
-        const fixIMEPosition = () => {
-          const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
-          const xtermScreen = terminalRef.current?.querySelector('.xterm-screen');
-          if (!textareaElement || !xtermScreen || !xtermRef.current) return;
-
-          try {
-            // 獲取游標位置 (從 xterm 的 buffer)
-            const buffer = xtermRef.current.buffer.active;
-            const cursorX = buffer.cursorX;
-            const cursorY = buffer.cursorY;
-
-            // 獲取終端的尺寸信息
-            const cols = xtermRef.current.cols;
-            const rows = xtermRef.current.rows;
-            const rect = xtermScreen.getBoundingClientRect();
-
-            // 計算每個字元的寬度和高度
-            const cellWidth = rect.width / cols;
-            const cellHeight = rect.height / rows;
-
-            // 計算 textarea 應該放置的位置（游標位置）
-            const left = cursorX * cellWidth;
-            const top = cursorY * cellHeight;
-
-            // 設置 textarea 位置 - 跟隨游標
-            textareaElement.style.position = 'absolute';
-            textareaElement.style.left = `${left}px`;
-            textareaElement.style.top = `${top}px`;
-            textareaElement.style.width = '1px';
-            textareaElement.style.height = `${cellHeight}px`; // 設置為一行高度
-            textareaElement.style.zIndex = '1';
-            textareaElement.style.opacity = '0';
-
-            // 設置 selection range
-            if (textareaElement.setSelectionRange) {
-              const length = textareaElement.value.length;
-              textareaElement.setSelectionRange(length, length);
-            }
-
-            console.log(`IME: Position at cursor (x=${cursorX}, y=${cursorY}, left=${left.toFixed(1)}px, top=${top.toFixed(1)}px)`);
-          } catch (err) {
-            console.warn('IME fix error:', err);
-          }
-        };
-
-        // 在 compositionstart 和 compositionupdate 時更新位置
-        const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
-        if (textareaElement) {
-          textareaElement.addEventListener('compositionstart', fixIMEPosition);
-          textareaElement.addEventListener('compositionupdate', fixIMEPosition);
-        }
 
         // 添加複製貼上功能
         xterm.attachCustomKeyEventHandler((event) => {

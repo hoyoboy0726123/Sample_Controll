@@ -209,12 +209,17 @@ export function createPtyService() {
             ...process.env,
             TERM: 'xterm-256color',
             COLORTERM: 'truecolor',
+            // 設置 UTF-8 編碼支援
+            LANG: 'en_US.UTF-8',
+            LC_ALL: 'en_US.UTF-8',
             // 禁用 ConPTY 的控制台進程列表獲取，避免 AttachConsole 錯誤
             NODE_PTY_USE_LEGACY: '0'
           },
           // Windows 特定選項
           useConpty: true,
-          conptyInheritCursor: false
+          conptyInheritCursor: false,
+          // 確保啟用 UTF-8 編碼
+          encoding: 'utf8'
         });
 
         // 监听数据输出

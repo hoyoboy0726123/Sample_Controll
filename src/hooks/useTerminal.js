@@ -226,7 +226,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
           window.electronAPI.writeToTerminal(terminalId, data);
         });
 
-        // 🎯 修復 IME 候選框定位 - 使用 Selection API
+        // 🎯 修復 IME 候選框定位 - 將候選框顯示在游標位置的上方
         // 根據 Electron Issue #4539: IME 位置錨定在 selection 或 activeElement
         // 參考：https://github.com/electron/electron/issues/4539
         const fixIMEPosition = () => {
@@ -248,9 +248,10 @@ export function useTerminal(terminalId, shell, cwd, command) {
             const cellWidth = dimensions?.css?.cell?.width || 9;
             const cellHeight = dimensions?.css?.cell?.height || 17;
 
-            // 計算游標像素位置
-            const left = 0; // 完全靠左對齊，避免偏移問題
-            const top = cursorY * cellHeight;
+            // 計算游標像素位置 - 使用實際的 X 座標，並將候選框放在上方一行
+            const left = cursorX * cellWidth;
+            // 將 textarea 放在游標上方一行，如果在第一行則保持在同一行
+            const top = Math.max(0, (cursorY - 1) * cellHeight);
 
             // 設置 textarea 位置
             textareaElement.style.position = 'absolute';
@@ -268,7 +269,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
               textareaElement.setSelectionRange(length, length);
             }
 
-            console.log(`IME: cursor(${cursorX},${cursorY}) -> px(left=0, top=${top.toFixed(1)})`);
+            console.log(`IME: cursor(${cursorX},${cursorY}) -> px(left=${left.toFixed(1)}, top=${top.toFixed(1)})`);
           } catch (err) {
             console.warn('IME fix error:', err);
           }

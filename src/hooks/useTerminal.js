@@ -234,6 +234,34 @@ export function useTerminal(terminalId, shell, cwd, command) {
           window.electronAPI.writeToTerminal(terminalId, data);
         });
 
+        // 🎯 改進 IME 支援：手動更新 textarea 位置
+        // 監聽 composition 事件以確保候選框位置正確
+        const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
+        if (textareaElement) {
+          // 當開始輸入中文時（composition start），立即更新 textarea 位置
+          textareaElement.addEventListener('compositionstart', () => {
+            if (!xtermRef.current || !terminalRef.current) return;
+
+            try {
+              // 獲取游標位置
+              const cursorX = xterm.buffer.active.cursorX;
+              const cursorY = xterm.buffer.active.cursorY;
+
+              // 計算實際像素位置
+              const charWidth = xterm._core._renderService?._renderer?.dimensions?.actualCellWidth || 9;
+              const charHeight = xterm._core._renderService?._renderer?.dimensions?.actualCellHeight || 17;
+
+              // 設置 textarea 位置到游標位置
+              textareaElement.style.left = `${cursorX * charWidth}px`;
+              textareaElement.style.top = `${cursorY * charHeight}px`;
+
+              console.log(`IME composition start - cursor at (${cursorX}, ${cursorY}), textarea positioned at (${cursorX * charWidth}px, ${cursorY * charHeight}px)`);
+            } catch (err) {
+              console.warn('Failed to update textarea position for IME:', err);
+            }
+          });
+        }
+
         // 添加複製貼上功能
         xterm.attachCustomKeyEventHandler((event) => {
           // Ctrl+C: 如果有選中文字則複製，否則發送中斷信號

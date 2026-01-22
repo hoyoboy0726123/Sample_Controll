@@ -18,6 +18,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
   const [isReady, setIsReady] = useState(false);
   const isInitializingRef = useRef(false);
   const commandExecutedRef = useRef(false); // 追蹤命令是否已執行
+  const isUnmountingRef = useRef(false); // 追蹤組件是否正在卸載（用戶主動關閉）
 
   useEffect(() => {
     // 防止重複初始化
@@ -154,6 +155,12 @@ export function useTerminal(terminalId, shell, cwd, command) {
         // 监听终端退出 - 保存清理函數
         cleanupTerminalExit = window.electronAPI.onTerminalExit((id, code) => {
           if (id === terminalId && xtermRef.current) {
+            // 如果組件正在卸載（用戶主動關閉標籤），不處理退出事件
+            if (isUnmountingRef.current) {
+              console.log(`Terminal ${id} exiting due to unmount, skip restart`);
+              return;
+            }
+
             // 根據退出碼決定訊息顏色和文字
             let message, color;
 
@@ -182,6 +189,35 @@ export function useTerminal(terminalId, shell, cwd, command) {
             }
 
             xtermRef.current.write(`\r\n${color}${message}\x1b[0m\r\n`);
+
+            // 🔧 自動重啟 shell（就像真正的終端）
+            // 延遲 500ms 讓用戶看到退出訊息
+            setTimeout(() => {
+              // 再次檢查是否正在卸載
+              if (isUnmountingRef.current || !xtermRef.current) {
+                return;
+              }
+
+              console.log(`Auto-restarting shell for terminal ${terminalId}`);
+
+              // 重新創建終端進程
+              window.electronAPI.createTerminal({
+                id: terminalId,
+                cwd: cwd || undefined,
+                shell: shell,
+              }).then(() => {
+                if (xtermRef.current) {
+                  // Shell 重啟成功，顯示提示
+                  xtermRef.current.write(`\x1b[90m[Shell restarted. Press Enter to continue]\x1b[0m\r\n`);
+                  setIsReady(true);
+                }
+              }).catch(err => {
+                console.error('Failed to restart shell:', err);
+                if (xtermRef.current) {
+                  xtermRef.current.write(`\x1b[31m[Failed to restart shell: ${err.message}]\x1b[0m\r\n`);
+                }
+              });
+            }, 500);
           }
         });
 
@@ -288,6 +324,9 @@ export function useTerminal(terminalId, shell, cwd, command) {
 
     // 清理（重構：按順序清理，避免重複代碼）
     return () => {
+      // 0. 設置卸載標誌（防止自動重啟）
+      isUnmountingRef.current = true;
+
       // 1. 清理計時器
       if (initTimer) {
         clearTimeout(initTimer);

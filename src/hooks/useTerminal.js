@@ -226,27 +226,38 @@ export function useTerminal(terminalId, shell, cwd, command) {
           window.electronAPI.writeToTerminal(terminalId, data);
         });
 
-        // 🎯 修復 IME 候選框定位 - 固定在終端中間位置
-        // 將 textarea 固定在可見區域的中間，避免位置計算問題
+        // 🎯 修復 IME 候選框定位 - 跟隨游標位置
+        // 根據 xterm 的游標位置來定位 textarea
         const fixIMEPosition = () => {
           const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
           const xtermScreen = terminalRef.current?.querySelector('.xterm-screen');
-          if (!textareaElement || !xtermScreen) return;
+          if (!textareaElement || !xtermScreen || !xtermRef.current) return;
 
           try {
-            // 獲取終端可見區域的尺寸
+            // 獲取游標位置 (從 xterm 的 buffer)
+            const buffer = xtermRef.current.buffer.active;
+            const cursorX = buffer.cursorX;
+            const cursorY = buffer.cursorY;
+
+            // 獲取終端的尺寸信息
+            const cols = xtermRef.current.cols;
+            const rows = xtermRef.current.rows;
             const rect = xtermScreen.getBoundingClientRect();
 
-            // 將 textarea 放在終端可見區域的中間偏上位置
-            const left = rect.width / 2;
-            const top = rect.height / 3; // 上方三分之一處
+            // 計算每個字元的寬度和高度
+            const cellWidth = rect.width / cols;
+            const cellHeight = rect.height / rows;
 
-            // 設置 textarea 位置 - 固定在中間
+            // 計算 textarea 應該放置的位置（游標位置）
+            const left = cursorX * cellWidth;
+            const top = cursorY * cellHeight;
+
+            // 設置 textarea 位置 - 跟隨游標
             textareaElement.style.position = 'absolute';
             textareaElement.style.left = `${left}px`;
             textareaElement.style.top = `${top}px`;
             textareaElement.style.width = '1px';
-            textareaElement.style.height = '1px';
+            textareaElement.style.height = `${cellHeight}px`; // 設置為一行高度
             textareaElement.style.zIndex = '1';
             textareaElement.style.opacity = '0';
 
@@ -256,17 +267,17 @@ export function useTerminal(terminalId, shell, cwd, command) {
               textareaElement.setSelectionRange(length, length);
             }
 
-            console.log(`IME: Fixed position at center (left=${left.toFixed(1)}, top=${top.toFixed(1)})`);
+            console.log(`IME: Position at cursor (x=${cursorX}, y=${cursorY}, left=${left.toFixed(1)}px, top=${top.toFixed(1)}px)`);
           } catch (err) {
             console.warn('IME fix error:', err);
           }
         };
 
-        // 只在 compositionstart 時更新位置，避免干擾輸入
+        // 在 compositionstart 和 compositionupdate 時更新位置
         const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
         if (textareaElement) {
-          // 只在開始輸入時定位一次
           textareaElement.addEventListener('compositionstart', fixIMEPosition);
+          textareaElement.addEventListener('compositionupdate', fixIMEPosition);
         }
 
         // 添加複製貼上功能

@@ -226,18 +226,24 @@ export function useTerminal(terminalId, shell, cwd, command) {
           window.electronAPI.writeToTerminal(terminalId, data);
         });
 
-        // 🎯 修復 IME 候選框定位 - 強制將 textarea 定位到游標位置
-        // Windows IME 候選框由操作系統根據 textarea 位置顯示
+        // 🎯 修復 IME 候選框定位 - 使用 Selection API
+        // 根據 Electron Issue #4539: IME 位置錨定在 selection 或 activeElement
+        // 參考：https://github.com/electron/electron/issues/4539
         const fixIMEPosition = () => {
           const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
           if (!textareaElement || !xterm.buffer) return;
 
           try {
+            // 確保 textarea 有 focus
+            if (document.activeElement !== textareaElement) {
+              textareaElement.focus();
+            }
+
             // 獲取游標位置
             const cursorX = xterm.buffer.active.cursorX;
             const cursorY = xterm.buffer.active.cursorY;
 
-            // 獲取字符尺寸（使用實際渲染尺寸）
+            // 獲取字符尺寸
             const dimensions = xterm._core._renderService?.dimensions;
             const cellWidth = dimensions?.css?.cell?.width || 9;
             const cellHeight = dimensions?.css?.cell?.height || 17;
@@ -246,7 +252,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
             const left = cursorX * cellWidth;
             const top = cursorY * cellHeight;
 
-            // 強制設置 textarea 位置和尺寸
+            // 設置 textarea 位置
             textareaElement.style.position = 'absolute';
             textareaElement.style.left = `${left}px`;
             textareaElement.style.top = `${top}px`;
@@ -255,7 +261,14 @@ export function useTerminal(terminalId, shell, cwd, command) {
             textareaElement.style.zIndex = '1';
             textareaElement.style.opacity = '0';
 
-            console.log(`IME: cursor(${cursorX},${cursorY}) -> px(${left},${top}), cell(${cellWidth.toFixed(1)}x${cellHeight.toFixed(1)})`);
+            // 🔑 關鍵：設置 textarea 的 selection range
+            // 這會告訴瀏覽器/IME 當前輸入位置在哪裡
+            if (textareaElement.setSelectionRange) {
+              const length = textareaElement.value.length;
+              textareaElement.setSelectionRange(length, length);
+            }
+
+            console.log(`IME: cursor(${cursorX},${cursorY}) -> px(${left.toFixed(1)},${top.toFixed(1)})`);
           } catch (err) {
             console.warn('IME fix error:', err);
           }
@@ -268,8 +281,8 @@ export function useTerminal(terminalId, shell, cwd, command) {
           textareaElement.addEventListener('compositionstart', fixIMEPosition);
           textareaElement.addEventListener('compositionupdate', fixIMEPosition);
 
-          // 鍵盤事件 - 在任何按鍵時更新（確保游標移動後更新）
-          textareaElement.addEventListener('keydown', fixIMEPosition);
+          // Focus 事件 - 當 textarea 獲得焦點時
+          textareaElement.addEventListener('focus', fixIMEPosition);
 
           // Input 事件 - 在輸入時更新
           textareaElement.addEventListener('input', fixIMEPosition);

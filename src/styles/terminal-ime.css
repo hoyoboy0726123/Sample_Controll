@@ -5,12 +5,12 @@
 
 /* xterm.js 的隱藏 textarea（用於捕獲輸入） */
 .xterm-helper-textarea {
-  /* 不強制設置位置，讓 xterm.js 動態管理以跟隨游標 */
+  /* 保持 xterm.js 默認行為，不強制覆蓋位置 */
   position: absolute !important;
   opacity: 0 !important;
-  /* 移除固定的 left: -9999em，讓 textarea 跟隨游標位置 */
-  width: 1px !important;
-  height: 1em !important;
+  /* 不設置 left/top，讓 xterm.js 自己管理 */
+  width: 0 !important;
+  height: 0 !important;
   z-index: -10;
   white-space: nowrap;
   overflow: hidden;

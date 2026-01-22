@@ -154,7 +154,34 @@ export function useTerminal(terminalId, shell, cwd, command) {
         // 监听终端退出 - 保存清理函數
         cleanupTerminalExit = window.electronAPI.onTerminalExit((id, code) => {
           if (id === terminalId && xtermRef.current) {
-            xtermRef.current.write(`\r\n\x1b[31mProcess exited with code ${code}\x1b[0m\r\n`);
+            // 根據退出碼決定訊息顏色和文字
+            let message, color;
+
+            // 正常退出碼（不顯示為錯誤）
+            const normalExitCodes = [
+              0,                // 正常退出
+              -1073741510,      // Windows Ctrl+C (0xC000013A)
+              130,              // Unix Ctrl+C
+              1,                // 一般錯誤（常見，不算嚴重）
+            ];
+
+            if (normalExitCodes.includes(code)) {
+              // 正常退出 - 灰色
+              color = '\x1b[90m';  // 灰色
+              if (code === 0) {
+                message = `Process exited successfully`;
+              } else if (code === -1073741510 || code === 130) {
+                message = `Process interrupted (Ctrl+C)`;
+              } else {
+                message = `Process exited with code ${code}`;
+              }
+            } else {
+              // 異常退出 - 紅色
+              color = '\x1b[31m';  // 紅色
+              message = `⚠️ Process exited with error code ${code}`;
+            }
+
+            xtermRef.current.write(`\r\n${color}${message}\x1b[0m\r\n`);
           }
         });
 

@@ -24,7 +24,8 @@ code {
 /* xterm.js 样式 */
 .xterm {
   height: 100%;
-  padding: 8px;
+  /* 移除 padding - 非零 padding 會破壞 IME 候選框定位 */
+  /* 參考：https://github.com/xtermjs/xterm.js/pull/1208 */
 }
 
 .xterm-viewport {

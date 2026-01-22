@@ -249,7 +249,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
             const cellHeight = dimensions?.css?.cell?.height || 17;
 
             // 計算游標像素位置
-            const left = cursorX * cellWidth;
+            const left = 0; // 完全靠左對齊，避免偏移問題
             const top = cursorY * cellHeight;
 
             // 設置 textarea 位置
@@ -268,7 +268,7 @@ export function useTerminal(terminalId, shell, cwd, command) {
               textareaElement.setSelectionRange(length, length);
             }
 
-            console.log(`IME: cursor(${cursorX},${cursorY}) -> px(${left.toFixed(1)},${top.toFixed(1)})`);
+            console.log(`IME: cursor(${cursorX},${cursorY}) -> px(left=0, top=${top.toFixed(1)})`);
           } catch (err) {
             console.warn('IME fix error:', err);
           }

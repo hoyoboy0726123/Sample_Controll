@@ -1,6 +1,40 @@
+import { useState, useRef, useEffect } from 'react';
 import { Terminal as TerminalIcon, Plus, X } from 'lucide-react';
 
-export default function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onNewTab }) {
+export default function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onRenameTab, onNewTab }) {
+  const [editingTabId, setEditingTabId] = useState(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const inputRef = useRef(null);
+
+  // 開始編輯標籤名稱
+  const startEditing = (tab) => {
+    setEditingTabId(tab.id);
+    setEditingTitle(tab.title);
+  };
+
+  // 完成編輯（保存）
+  const finishEditing = () => {
+    if (editingTabId && editingTitle.trim()) {
+      onRenameTab(editingTabId, editingTitle.trim());
+    }
+    setEditingTabId(null);
+    setEditingTitle('');
+  };
+
+  // 取消編輯
+  const cancelEditing = () => {
+    setEditingTabId(null);
+    setEditingTitle('');
+  };
+
+  // 自動聚焦輸入框
+  useEffect(() => {
+    if (editingTabId && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select(); // 選中所有文字
+    }
+  }, [editingTabId]);
+
   return (
     <div className="flex items-center bg-[#2d2d2d] border-b border-[#3e3e3e] h-12">
       <div className="flex items-center overflow-x-auto flex-1">
@@ -15,24 +49,56 @@ export default function TabBar({ tabs, activeTabId, onTabSelect, onTabClose, onN
                 : 'bg-[#2d2d2d] text-gray-400 hover:bg-[#363636]'
               }
             `}
-            onClick={() => onTabSelect(tab.id)}
+            onClick={() => editingTabId !== tab.id && onTabSelect(tab.id)}
           >
             <TerminalIcon size={16} className="flex-shrink-0" />
-            <span className="flex-1 truncate text-sm">
-              {tab.title}
-            </span>
-            <button
-              className={`
-                flex-shrink-0 p-1 rounded hover:bg-[#4e4e4e] transition-colors
-                ${activeTabId === tab.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
-              `}
-              onClick={(e) => {
-                e.stopPropagation();
-                onTabClose(tab.id);
-              }}
-            >
-              <X size={14} />
-            </button>
+
+            {/* 編輯模式：顯示輸入框 */}
+            {editingTabId === tab.id ? (
+              <input
+                ref={inputRef}
+                type="text"
+                value={editingTitle}
+                onChange={(e) => setEditingTitle(e.target.value)}
+                onBlur={finishEditing}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    finishEditing();
+                  } else if (e.key === 'Escape') {
+                    cancelEditing();
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                className="flex-1 bg-[#3c3c3c] text-white text-sm px-2 py-1 rounded
+                           border border-[#007acc] outline-none"
+                maxLength={50}
+              />
+            ) : (
+              /* 正常模式：顯示標題（雙擊編輯） */
+              <span
+                className="flex-1 truncate text-sm"
+                onDoubleClick={() => startEditing(tab)}
+                title={`雙擊編輯標籤名稱\n${tab.title}`}
+              >
+                {tab.title}
+              </span>
+            )}
+
+            {/* 關閉按鈕（編輯時隱藏） */}
+            {editingTabId !== tab.id && (
+              <button
+                className={`
+                  flex-shrink-0 p-1 rounded hover:bg-[#4e4e4e] transition-colors
+                  ${activeTabId === tab.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+                `}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTabClose(tab.id);
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
         ))}
       </div>

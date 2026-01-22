@@ -7,6 +7,18 @@ import SettingsPanel from './components/SettingsPanel';
 import ProjectGroupsManager from './components/ProjectGroupsManager';
 import { Settings, Moon, Sun, FolderOpen } from 'lucide-react';
 
+// 🎯 輔助函數：從路徑提取資料夾名稱
+function getFolderName(cwd) {
+  if (!cwd || typeof cwd !== 'string') return 'Terminal';
+
+  // 處理 Windows 和 Unix 路徑
+  const parts = cwd.split(/[\/\\]/);
+
+  // 過濾空字符串並獲取最後一個部分
+  const filtered = parts.filter(Boolean);
+  return filtered[filtered.length - 1] || 'Terminal';
+}
+
 function App() {
   // 使用 useRef 而非模組級變量，避免競態條件
   const terminalIdCounterRef = useRef(0);
@@ -99,9 +111,14 @@ function App() {
       ? (settings.defaultShell === 'auto' ? undefined : settings.defaultShell)
       : options.shell;
 
+    // 🎯 使用資料夾名稱作為預設標籤名（如果提供了 cwd）
+    const defaultTitle = options.cwd
+      ? getFolderName(options.cwd)
+      : `Terminal ${terminalIdCounterRef.current}`;
+
     const newTab = {
       id,
-      title: `Terminal ${terminalIdCounterRef.current}`,
+      title: options.title || defaultTitle, // 允許手動指定或使用資料夾名稱
       shell,
       cwd: options.cwd,
       command: options.command, // 要在新終端執行的命令
@@ -244,6 +261,15 @@ function App() {
       });
     });
   }, [createNewTab]);
+
+  // 🎯 重命名標籤
+  const renameTab = useCallback((id, newTitle) => {
+    setTabs((prev) =>
+      prev.map((tab) =>
+        tab.id === id ? { ...tab, title: newTitle || tab.title } : tab
+      )
+    );
+  }, []);
 
   // 关闭标签页
   const closeTab = useCallback((id) => {
@@ -467,6 +493,7 @@ function App() {
         activeTabId={activeTabId}
         onTabSelect={selectTab}
         onTabClose={closeTab}
+        onRenameTab={renameTab}
         onNewTab={handleNewTabClick}
       />
 

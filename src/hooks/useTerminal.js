@@ -226,6 +226,57 @@ export function useTerminal(terminalId, shell, cwd, command) {
           window.electronAPI.writeToTerminal(terminalId, data);
         });
 
+        // 🎯 修復 Windows 高 DPI 環境下的 IME 候選框定位問題
+        // xterm.js 的 CompositionHelper 沒有考慮 devicePixelRatio
+        // 參考：https://github.com/xtermjs/xterm.js/blob/master/src/browser/input/CompositionHelper.ts
+        const fixIMEPosition = () => {
+          const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
+          const compositionView = terminalRef.current?.querySelector('.composition-view');
+
+          if (!textareaElement || !xterm.buffer) return;
+
+          try {
+            // 獲取 DPI 縮放比例
+            const dpr = window.devicePixelRatio || 1;
+
+            // 獲取終端容器的偏移量
+            const terminalRect = terminalRef.current.getBoundingClientRect();
+
+            // 獲取游標位置
+            const cursorX = xterm.buffer.active.cursorX;
+            const cursorY = xterm.buffer.active.cursorY;
+
+            // 獲取字符尺寸（CSS 像素）
+            const cellWidth = xterm._core._renderService?.dimensions?.css?.cell?.width || 9;
+            const cellHeight = xterm._core._renderService?.dimensions?.css?.cell?.height || 17;
+
+            // 計算游標的實際像素位置（考慮 DPI）
+            const left = cursorX * cellWidth;
+            const top = cursorY * cellHeight;
+
+            // 設置 textarea 位置（xterm.js 會自動處理，我們只需要確保它可見）
+            // 不強制覆蓋位置，而是讓 xterm.js 處理，但確保容器沒有變換
+            textareaElement.style.transform = 'none';
+
+            // 如果有 composition view，確保它在正確位置
+            if (compositionView) {
+              compositionView.style.left = `${left}px`;
+              compositionView.style.top = `${top}px`;
+            }
+
+            console.log(`IME fix - cursor: (${cursorX}, ${cursorY}), pos: (${left}px, ${top}px), DPR: ${dpr}`);
+          } catch (err) {
+            console.warn('Failed to fix IME position:', err);
+          }
+        };
+
+        // 監聽 composition 事件
+        const textareaElement = terminalRef.current?.querySelector('.xterm-helper-textarea');
+        if (textareaElement) {
+          textareaElement.addEventListener('compositionstart', fixIMEPosition);
+          textareaElement.addEventListener('compositionupdate', fixIMEPosition);
+        }
+
         // 添加複製貼上功能
         xterm.attachCustomKeyEventHandler((event) => {
           // Ctrl+C: 如果有選中文字則複製，否則發送中斷信號

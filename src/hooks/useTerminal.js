@@ -3,6 +3,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { WebLinksAddon } from 'xterm-addon-web-links';
 import 'xterm/css/xterm.css';
+import '../styles/terminal-ime.css'; // 🎯 改進中文輸入法支援
 
 // 🔒 驗證常數
 const VALIDATION = {
@@ -78,6 +79,11 @@ export function useTerminal(terminalId, shell, cwd, command) {
         scrollback: VALIDATION.SCROLLBACK_BUFFER,
         rows: 24,
         cols: 80,
+        // 🎯 改進中文輸入法（IME）支援
+        screenReaderMode: false, // 保持 false 但改進 composition
+        windowOptions: {
+          setWinLines: false,
+        },
       });
 
       // 添加插件

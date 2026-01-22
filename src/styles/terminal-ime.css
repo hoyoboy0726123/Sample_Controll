@@ -1,0 +1,66 @@
+/**
+ * 改進中文輸入法（IME）支援
+ * 確保候選框出現在游標位置，而不是視窗角落
+ */
+
+/* xterm.js 的隱藏 textarea（用於捕獲輸入） */
+.xterm-helper-textarea {
+  /* 確保 textarea 跟隨游標位置 */
+  position: absolute !important;
+  opacity: 0;
+  left: -9999em;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: -10;
+  white-space: nowrap;
+  overflow: hidden;
+
+  /* IME 相關設置 */
+  ime-mode: active;
+  -ms-ime-mode: active;
+
+  /* 確保輸入法候選框可以正確定位 */
+  pointer-events: none;
+}
+
+/* 當有 composition 進行時 */
+.xterm-helper-textarea:focus {
+  /* 讓輸入法知道正確的位置 */
+  position: absolute !important;
+  /* 實際位置會由 xterm.js 動態設置 */
+}
+
+/* xterm 容器確保正確的定位上下文 */
+.xterm {
+  position: relative;
+}
+
+/* Composition view（候選框容器） */
+.xterm .composition-view {
+  position: absolute;
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #888888;
+  padding: 2px 4px;
+  border-radius: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  font-family: inherit;
+  font-size: inherit;
+  white-space: pre;
+  z-index: 1000;
+  /* 位置會由 JavaScript 動態設置 */
+}
+
+/* 確保 IME 候選框在正確的 z-index */
+.xterm .xterm-screen {
+  position: relative;
+  z-index: 0;
+}
+
+/* Windows IME 特殊處理 */
+@media screen and (-ms-high-contrast: active), (-ms-high-contrast: none) {
+  .xterm-helper-textarea {
+    ime-mode: active;
+  }
+}

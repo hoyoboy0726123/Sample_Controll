@@ -5,22 +5,21 @@
 
 /* xterm.js 的隱藏 textarea（用於捕獲輸入） */
 .xterm-helper-textarea {
-  /* 確保 textarea 跟隨游標位置 */
+  /* 不強制設置位置，讓 xterm.js 動態管理以跟隨游標 */
   position: absolute !important;
-  opacity: 0;
-  left: -9999em;
-  top: 0;
-  width: 0;
-  height: 0;
+  opacity: 0 !important;
+  /* 移除固定的 left: -9999em，讓 textarea 跟隨游標位置 */
+  width: 1px !important;
+  height: 1em !important;
   z-index: -10;
   white-space: nowrap;
   overflow: hidden;
 
-  /* IME 相關設置 */
+  /* IME 相關設置 - 啟用輸入法支援 */
   ime-mode: active;
   -ms-ime-mode: active;
 
-  /* 確保輸入法候選框可以正確定位 */
+  /* 確保不會攔截鼠標事件 */
   pointer-events: none;
 }
 

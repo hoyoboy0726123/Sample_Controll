@@ -80,10 +80,12 @@ export function useTerminal(terminalId, shell, cwd, command) {
         rows: 24,
         cols: 80,
         // 🎯 改進中文輸入法（IME）支援
-        screenReaderMode: false, // 保持 false 但改進 composition
+        screenReaderMode: false,
+        windowsMode: true, // 改善 Windows 上的 IME 行為
         windowOptions: {
           setWinLines: false,
         },
+        convertEol: false, // 保持原始換行符處理
       });
 
       // 添加插件

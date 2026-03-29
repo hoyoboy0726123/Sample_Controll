@@ -3,6 +3,8 @@ node_modules/
 
 # Production
 dist/
+dist-electron/
+out/
 build/
 
 # Misc

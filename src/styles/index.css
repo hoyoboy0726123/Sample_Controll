@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+}
+
+code {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+}
+
+/* xterm.js 样式 */
+.xterm {
+  height: 100%;
+  /* 移除 padding - 非零 padding 會破壞 IME 候選框定位 */
+  /* 參考：https://github.com/xtermjs/xterm.js/pull/1208 */
+}
+
+.xterm-viewport {
+  overflow-y: auto;
+  background-color: #1e1e1e;
+}
+
+.xterm-screen {
+  background-color: #1e1e1e;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #666;
+}
+
+/* 分割线样式 */
+.split-view-divider {
+  background: #3e3e3e;
+  cursor: col-resize;
+  transition: background 0.2s;
+}
+
+.split-view-divider:hover {
+  background: #007acc;
+}
+
+/* 标签页动画 */
+.tab-enter {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.tab-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 200ms, transform 200ms;
+}
+
+.tab-exit {
+  opacity: 1;
+}
+
+.tab-exit-active {
+  opacity: 0;
+  transition: opacity 200ms;
+}
